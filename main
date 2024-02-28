@@ -1,0 +1,36 @@
+import json
+json_data = json.load(open('data.json'))[0]
+def update_data_json_file():
+    with open("./text.txt", 'r') as file:
+        for line in file:
+            key, value = line.strip().split('=')
+            key, value = key.strip(), value.strip()
+            key_hierarchy = find_key(json_data, key)
+            updated_json = update_dict_value(json_data, key_hierarchy, value)
+
+    with open("./data.json", 'r+') as replace_file:
+        replace_file.truncate(0)
+        replace_file.write(json.dumps([updated_json]))
+
+def find_key(d, value):
+    for k, v in d.items():
+        if isinstance(v, list):
+            v = dict(v[0])
+        if isinstance(v, dict):
+            p = find_key(v, value)
+            if p:
+                return [k] + p
+        elif k == value:
+            return [k]
+
+def update_dict_value(d, keys, new_value):
+    current_dict = d
+    if keys is not None:
+        for key in keys[:-1]:
+            current_dict = current_dict[key]
+            if isinstance(current_dict, list):
+                current_dict = current_dict[0]
+        current_dict[keys[-1]] = new_value
+        return d
+
+update_data_json_file()
