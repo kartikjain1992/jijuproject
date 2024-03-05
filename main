@@ -30,7 +30,10 @@ def update_dict_value(d, keys, new_value):
             current_dict = current_dict[key]
             if isinstance(current_dict, list):
                 current_dict = current_dict[0]
-        current_dict[keys[-1]] = new_value
+        # current_dict[keys[-1]] = new_value
+        del current_dict[keys[-1]]
         return d
+    else:
+        return True
 
 update_data_json_file()
