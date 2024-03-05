@@ -8,9 +8,10 @@ def update_data_json_file():
             key_hierarchy = find_key(json_data, key)
             updated_json = update_dict_value(json_data, key_hierarchy, value)
 
-    with open("./data.json", 'r+') as replace_file:
-        replace_file.truncate(0)
-        replace_file.write(json.dumps([updated_json]))
+    if updated_json is not None:
+        with open("./data.json", 'r+') as replace_file:
+            replace_file.truncate(0)
+            replace_file.write(json.dumps([updated_json]))
 
 def find_key(d, value):
     for k, v in d.items():
@@ -34,6 +35,6 @@ def update_dict_value(d, keys, new_value):
         del current_dict[keys[-1]]
         return d
     else:
-        return True
+        return
 
 update_data_json_file()
