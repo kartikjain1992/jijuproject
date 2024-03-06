@@ -1,0 +1,19 @@
+import time
+import win32api
+from pyautogui._pyautogui_win import MOUSEEVENTF_HWHEEL, MOUSEEVENTF_WHEEL
+
+def my_decorator_func(coordinates, scroll_type):
+    def wrapper_func(my_func):
+        time.sleep(2)
+        if scroll_type == "Vertical":
+            print("a")
+            win32api.mouse_event(MOUSEEVENTF_WHEEL, 0, 0, coordinates, 0)# Vertical scrolling
+        else:
+            print("b")
+            win32api.mouse_event(MOUSEEVENTF_HWHEEL, 0, 0, coordinates, 0)# Horizontal scrolling
+    return wrapper_func
+
+
+@my_decorator_func(5000, "Vertical")
+def my_func():
+    print("Success")
