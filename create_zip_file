@@ -1,0 +1,10 @@
+import os, zipfile
+def create_zip(source_folder, destination_folder):
+    with zipfile.ZipFile(destination_folder, 'w', zipfile.ZIP_DEFLATED) as zip_ref:
+        for folder_name, subfolders, filenames in os.walk(source_folder):
+            for filename in filenames:
+                file_path = os.path.join(folder_name, filename)
+                zip_ref.write(file_path, arcname=os.path.relpath(file_path, source_folder))
+    zip_ref.close()
+create_zip(source_folder = 'folder', destination_folder = 'zipped/abc' + '.zip')
+
