@@ -1,54 +1,50 @@
 import mysql.connector
 from mysql.connector import Error
 
-def fetch_and_compare(db_config, table_name, column_name, user_value):
-    try:
-        # Connect to the MySQL database
-        conn = mysql.connector.connect(
-            host=db_config['host'],
-            database=db_config['database'],
-            user=db_config['user'],
-            password=db_config['password']
-        )
-        
-        if conn.is_connected():
-            cursor = conn.cursor()
-            
-            # Prepare the SQL query
-            query = f"SELECT {column_name} FROM {table_name}"
-            
-            # Execute the query
-            cursor.execute(query)
-            rows = cursor.fetchall()
-            
-            # Compare each value in the specified column with the user-given value
-            matches = [row[0] for row in rows if row[0] == user_value]
-            
-            # Print the result
-            if matches:
-                print(f"Found {len(matches)} match(es) for the value '{user_value}' in the column '{column_name}' of the table '{table_name}'.")
-            else:
-                print(f"No matches found for the value '{user_value}' in the column '{column_name}' of the table '{table_name}'.")
-    
-    except Error as e:
-        print(f"An error occurred: {e}")
-    
-    finally:
-        # Close the connection
-        if conn.is_connected():
-            cursor.close()
-            conn.close()
+class DatabaseLibrary:
+    def fetch_and_compare(self, host, database, user, password, table, column, value):
+        db_config = {
+            'host': host,
+            'database': database,
+            'user': user,
+            'password': password
+        }
+        self._fetch_and_compare(db_config, table, column, value)
 
-# Example usage
-if __name__ == "__main__":
-    db_config = {
-        'host': 'your_host',
-        'database': 'your_database',
-        'user': 'your_username',
-        'password': 'your_password'
-    }
-    table_name = 'example_table'          # Name of the table
-    column_name = 'value_column'          # Name of the column to fetch data from
-    user_value = 'value_to_compare'       # User-given value to compare
+    def _fetch_and_compare(self, db_config, table_name, column_name, user_value):
+        try:
+            # Connect to the MySQL database
+            conn = mysql.connector.connect(
+                host=db_config['host'],
+                database=db_config['database'],
+                user=db_config['user'],
+                password=db_config['password']
+            )
 
-    fetch_and_compare(db_config, table_name, column_name, user_value)
+            if conn.is_connected():
+                cursor = conn.cursor()
+
+                # Prepare the SQL query
+                query = f"SELECT {column_name} FROM {table_name}"
+
+                # Execute the query
+                cursor.execute(query)
+                rows = cursor.fetchall()
+
+                # Compare each value in the specified column with the user-given value
+                matches = [row[0] for row in rows if row[0] == user_value]
+
+                # Print the result
+                if matches:
+                    print(f"Found {len(matches)} match(es) for the value '{user_value}' in the column '{column_name}' of the table '{table_name}'.")
+                else:
+                    print(f"No matches found for the value '{user_value}' in the column '{column_name}' of the table '{table_name}'.")
+
+        except Error as e:
+            print(f"An error occurred: {e}")
+
+        finally:
+            # Close the connection
+            if conn.is_connected():
+                cursor.close()
+                conn.close()
