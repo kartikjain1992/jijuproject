@@ -1,0 +1,16 @@
+database_1 = {
+    "host": "localhost",
+    "database": "ankit_jain_1",
+    "username": "root",
+    "password": "admin@123"
+}
+
+database_2 = {
+    "host": "localhost",
+    "database": "ankit_jain_2",
+    "username": "root",
+    "password": "admin@123"
+}
+
+table_1 = "employee_1"
+table_2 = "employee_2"
