@@ -12,21 +12,36 @@ def create_database_instance(database_credentials):
 def fetch_data_from_table(table_name, column_names, database_credentials, sorting_column):
     database_object = create_database_instance(database_credentials)
     if database_object.is_connected():
-        cursor = database_object.cursor()
+        cursor = database_object.cursor(dictionary=True)
         # Prepare the SQL query
-        query = f"SELECT {column_names} FROM {table_name} Order By {sorting_column}"
+        query = f"SELECT * FROM {table_name} Order By {sorting_column}"
         # Execute the query
         cursor.execute(query)
         data = cursor.fetchall()
         return data
 
 
-def compare_tables_data():
-    employee_1_data = []
-    employee_2_data = []
+def compare_tables_data(database_credentials):
+    database_object = create_database_instance(database_credentials)
     employee_1_object = fetch_data_from_table("employee_1", "unique_key", database_1, "id")
-    employee_2_object = fetch_data_from_table("employee_2", "unique_key", database_2, "id")
-    [employee_1_data.append(row[0]) for row in employee_1_object]
-    [employee_2_data.append(row[0]) for row in employee_2_object]
-    print("records " + str(list(set(employee_1_data) - set(employee_2_data))) + " is missing in " + database_2["database"] + "->" + table_2)
-    print("records " + str(list(set(employee_2_data) - set(employee_1_data))) + " is missing in " + database_1["database"] + "->" + table_1)
+    cursor = database_object.cursor(dictionary=True)
+    for row in employee_1_object:
+        where_value = row['unique_key']
+        query = f"SELECT * FROM employee_2 where unique_key = '{where_value}'"
+        # Execute the query
+        cursor.execute(query)
+        data = cursor.fetchall()
+        if data.__len__() == 0:
+            print("Data with " + row["unique_key"] +" unique key is not found" + " in " + database_2["database"] + " database")
+            continue
+        data = data[0]
+        if row == data:
+            continue
+        if row['name'] != data['name']:
+            print("Name of " + row["unique_key"] +" unique key is miss matched")
+        if row['surname'] != data['surname']:
+            print("Surname of " + row["unique_key"] +" unique key is miss matched")
+        if row['address'] != data['address']:
+            print("Address of " + row["unique_key"] +" unique key is miss matched")
+
+compare_tables_data(database_2)
