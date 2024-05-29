@@ -1,0 +1,82 @@
+import mysql.connector
+from concurrent.futures import ThreadPoolExecutor
+
+from numpy.ma import count
+
+
+# Function to fetch data from the first table in chunks
+def fetch_data_chunk(table_name, offset, limit):
+    conn_1 = mysql.connector.connect(
+        host= "localhost",
+        database= "ankit_jain_1",
+        user= "root",
+        password= "admin123"
+    )
+    cursor_1 = conn_1.cursor()
+    cursor_1.execute(f"SELECT * FROM {table_name} LIMIT {limit} OFFSET {offset}")
+    return cursor_1.fetchall()
+
+# Function to fetch data from the second table in chunks
+def fetch_data_chunk_2(table_name, offset, limit):
+    conn_2 = mysql.connector.connect(
+        host="localhost",
+        database="ankit_jain_2",
+        user="root",
+        password="admin123"
+    )
+    cursor_2 = conn_2.cursor()
+    cursor_2.execute(f"SELECT * FROM {table_name} LIMIT {limit} OFFSET {offset}")
+    return cursor_2.fetchall()
+
+# Function to find unmatched column values
+def find_unmatched_values(chunk_1, chunk_2):
+    unmatched_values = []
+    for row in chunk_1:
+        if row not in chunk_2:
+            unmatched_values.append(row)
+    return unmatched_values
+
+if __name__ == "__main__":
+    table_name_1 = "data1"
+    table_name_2 = "data2"
+    chunk_size = 500  # Number of rows to fetch at a time
+
+    # Connect to databases
+    conn_1 = mysql.connector.connect(
+        host="localhost",
+        database="ankit_jain_1",
+        user="root",
+        password="admin123"
+    )
+    conn_2 = mysql.connector.connect(
+        host="localhost",
+        database="ankit_jain_2",
+        user="root",
+        password="admin123"
+    )
+
+    # Get total number of rows in tables
+    cursor_1 = conn_1.cursor()
+    cursor_1.execute(f"SELECT COUNT(*) FROM {table_name_1}")
+    total_rows_table_1 = cursor_1.fetchone()[0]
+
+    cursor_2 = conn_2.cursor()
+    cursor_2.execute(f"SELECT COUNT(*) FROM {table_name_2}")
+    total_rows_table_2 = cursor_2.fetchone()[0]
+
+    # Use multithreading to fetch data in chunks
+    unmatched_values = []
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        for offset in range(0, max(total_rows_table_1, total_rows_table_2), chunk_size):
+            chunk_1 = executor.submit(fetch_data_chunk, table_name_1, offset, chunk_size).result()
+            chunk_2 = executor.submit(fetch_data_chunk_2, table_name_2, offset, chunk_size).result()
+            unmatched_values.extend(find_unmatched_values(chunk_1, chunk_2))
+
+    # Output unmatched values
+    for row in unmatched_values:
+        print(row)
+    print("Total Unmatched Count", len(unmatched_values))
+
+    # Close connections
+    conn_1.close()
+    conn_2.close()
