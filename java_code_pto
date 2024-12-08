@@ -1,0 +1,285 @@
+public class PTXDetailsUpdater {
+
+    public void changePTXDetailsStatus(String ptxID, String ptxControl, String status, String commentNotes) {
+        String comments = "//span[text()='" + status + "']";
+        String xpathExpression = "//input[@id='ptxIdInput']";
+
+        try {
+            if (getText(By.xpath(xpathExpression)).equalsIgnoreCase(ptxID)) {
+                switch (ptxControl.toUpperCase()) {
+                    case "REGRESSION TEST CONTROL":
+                        clickElement(By.xpath("//label[normalize-space()='Regression Test Control']"));
+                        clickElement(By.xpath(comments));
+                        setInputValue(By.xpath("//textarea[@id='regTestRemarkInput']"), commentNotes);
+                        break;
+
+                    case "PERFORMANCE TEST CONTROL":
+                        clickElement(By.xpath("//label[normalize-space()='Performance Test Control']"));
+                        clickElement(By.xpath(comments));
+                        setInputValue(By.xpath("//textarea[@id='loadPerfTestRemarkInput']"), commentNotes);
+                        break;
+
+                    case "BUSINESS/UAT TEST CONTROL":
+                        clickElement(By.xpath("//label[normalize-space()='Business/UAT Test Control']"));
+                        clickElement(By.xpath(comments));
+                        setInputValue(By.xpath("//textarea[@id='uatTestRemarkInput']"), commentNotes);
+                        break;
+
+                    // Add more cases as needed
+                    default:
+                        System.out.println("Invalid test control type: " + ptxControl);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private String getText(By by) {
+        // Implement the method to return text from the web element located by 'by'
+        // Example: return driver.findElement(by).getText();
+        return ""; // Placeholder return statement
+    }
+
+    private void clickElement(By by) {
+        // Implement the method to click the web element located by 'by'
+        // Example: driver.findElement(by).click();
+    }
+
+    private void setInputValue(By by, String value) {
+        // Implement the method to set input value of the web element located by 'by'
+        // Example: driver.findElement(by).sendKeys(value);
+    }
+
+    public static void main(String[] args) {
+        PTXDetailsUpdater updater = new PTXDetailsUpdater();
+        updater.changePTXDetailsStatus("PTX1234", "REGRESSION TEST CONTROL", "Pass", "Test passed successfully.");
+        updater.changePTXDetailsStatus("PTX1234", "PERFORMANCE TEST CONTROL", "Fail", "Performance test failed.");
+        updater.changePTXDetailsStatus("PTX1234", "BUSINESS/UAT TEST CONTROL", "Exception Raised", "Exception during UAT.");
+    }
+}
+
+
+
+
+
+
+
+
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.chrome.ChromeDriver;
+
+public class DateEntry {
+
+    public static void enterDate(WebDriver driver, String xpath, int date, String month, int year) {
+        // Convert month name to month number
+        String monthNumber;
+        switch (month.toLowerCase()) {
+            case "january":
+                monthNumber = "01";
+                break;
+            case "february":
+                monthNumber = "02";
+                break;
+            case "march":
+                monthNumber = "03";
+                break;
+            case "april":
+                monthNumber = "04";
+                break;
+            case "may":
+                monthNumber = "05";
+                break;
+            case "june":
+                monthNumber = "06";
+                break;
+            case "july":
+                monthNumber = "07";
+                break;
+            case "august":
+                monthNumber = "08";
+                break;
+            case "september":
+                monthNumber = "09";
+                break;
+            case "october":
+                monthNumber = "10";
+                break;
+            case "november":
+                monthNumber = "11";
+                break;
+            case "december":
+                monthNumber = "12";
+                break;
+            default:
+                throw new IllegalArgumentException("Invalid month: " + month);
+        }
+
+        // Format date as MM/DD/YYYY
+        String formattedDate = String.format("%02d/%02d/%04d", Integer.parseInt(monthNumber), date, year);
+
+        // Find the text box using its XPath and enter the date
+        WebElement dateTextBox = driver.findElement(By.xpath(xpath));
+        dateTextBox.clear();
+        dateTextBox.sendKeys(formattedDate);
+    }
+
+    public static void main(String[] args) {
+        // Set up WebDriver (assume you have the chromedriver.exe in your system PATH)
+        System.setProperty("webdriver.chrome.driver", "path/to/chromedriver");
+        WebDriver driver = new ChromeDriver();
+
+        // Open your webpage
+        driver.get("http://your-webpage-url.com");
+
+        // Enter the date into the text box
+        enterDate(driver, "//input[@id='dateTextBox']", 8, "june", 2024);
+
+        // Close the driver
+        driver.quit();
+    }
+}
+
+
+
+
+
+
+public void changePtoDetailStatus(String ptoId, String ptoTest, String updateStatus, String workNotes) {
+    String updatedStatus = "//span[text()='" + updateStatus + "']";
+    try {
+        if (isDisplayed(By.xpath(PtoEditSaveButton))) {
+            // Split the ptoTest string by comma and trim each value
+            String[] ptoTests = ptoTest.split(",");
+            for (String test : ptoTests) {
+                switch (test.trim().toUpperCase()) {
+                    case "SMOKE TEST CONTROL":
+                        clickElement(PtoEditPtoSmokeTestControlDropdown);
+                        clickElement(updatedStatus);
+                        setInputValue(PtoEditSmokeTestRemarkNotes, workNotes);
+                        break;
+                    case "REGRESSION TEST CONTROL":
+                        clickElement(PtoEditRegressionTestControlDropdown);
+                        clickElement(updatedStatus);
+                        setInputValue(PtoEditRegressionRemarkNotes, workNotes);
+                        break;
+                    case "LOAD PERFORMANCE TEST":
+                        clickElement(PtoEditLoadPerformanceDropdown);
+                        clickElement(updatedStatus);
+                        setInputValue(PtoEditLoadPerformanceRemarkNotes, workNotes);
+                        break;
+                    case "BUSINESS/UAT TEST CONTROL":
+                        clickElement(PtoEditBusinessUatDropdown);
+                        clickElement(updatedStatus);
+                        setInputValue(PtoEditBusinessUatRemarkNotes, workNotes);
+                        break;
+                    default:
+                        System.out.println("Invalid test type: " + test);
+                        break;
+                }
+            }
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+}
+
+
+
+
+ if (record.contains(valueToCheck)) {
+        System.out.println(valueToCheck + " is available in record: " + record);
+    } else {
+        System.out.println("No Record found with '" + valueToCheck + "'");
+    }
+
+
+
+
+
+
+public void PTOExceptionPerformDetailsMultiple(String ShortDescription, String Description, String Justification, String AlternateSolution, String DeniedPolicy, String RatingFactors, String WaiverStatus, String ResponsibleGroupValue, String CaseType) {
+    
+    customWait(3000);
+
+    // Common Validation for all cases
+    if (getText(ptoExceptionPerform).equals("PER Form")) {
+        AssertionLibrary.assertTrue(true, "PER Form Page Validated");
+    } else {
+        AssertionLibrary.assertTrue(false, "PER Form Page Validation Failed");
+    }
+
+    AssertionLibrary.assertTrue(isDisplayed(ptoEditExceptionCategory), "Category Validated");
+
+    switch (CaseType.toUpperCase()) {
+        case "SMOKE":
+            // Steps for SMOKE testing
+            setInputValue(ptoEditExceptionShortDescriptionTextbox, ShortDescription);
+            setInputValue(ptoEditExceptionDescriptionTextbox, Description);
+            setInputValue(ptoEditExceptionJustificationTextbox, Justification);
+            setInputValue(ptoEditExceptionAlternateSolutionTextbox, AlternateSolution);
+            setInputValue(ptoEditExceptionDeniedPolicyTextbox, DeniedPolicy);
+            setInputValue(ptoEditExceptionRatingFactorTextbox, RatingFactors);
+            clickElement(ptoEditExceptionPolicyWaiverTextbox);
+            clickElement(WaiverStatus.replace("oldWaiverEnterpriseWide", waiverEnterpriseWide));
+            AssertionLibrary.assertTrue(isDisplayed(ptoEditExceptionValidFromTextbox), "Valid From Date Validated");
+            DateSelector(ptoEditExceptionValidToTextbox, date, month, year);
+            clickElement(ptoEditExceptionViolationIdentification);
+            clickElement(ptoEditExceptionResponsibleGroup);
+            customWait(2000);
+            scrollByElementVisibility(ptoEditExceptionResponsibleGroup);
+            customWait(2000);
+            setInputValue(ptoEditExceptionResponsibleGroupTextbox, ResponsibleGroupValue);
+            clickElement(ptoEditExceptionSubmitButton);
+            break;
+
+        case "REGRESSION":
+            // Steps for REGRESSION testing
+            setInputValue(ptoEditExceptionShortDescriptionTextbox, ShortDescription);
+            setInputValue(ptoEditExceptionDescriptionTextbox, Description);
+            setInputValue(ptoEditExceptionJustificationTextbox, Justification);
+            setInputValue(ptoEditExceptionAlternateSolutionTextbox, AlternateSolution);
+            setInputValue(ptoEditExceptionDeniedPolicyTextbox, DeniedPolicy);
+            setInputValue(ptoEditExceptionRatingFactorTextbox, RatingFactors);
+            clickElement(ptoEditExceptionPolicyWaiverTextbox);
+            clickElement(WaiverStatus.replace("oldWaiverEnterpriseWide", waiverEnterpriseWide));
+            AssertionLibrary.assertTrue(isDisplayed(ptoEditExceptionValidFromTextbox), "Valid From Date Validated");
+            DateSelector(ptoEditExceptionValidToTextbox, date, month, year);
+            clickElement(ptoEditExceptionViolationIdentification);
+            clickElement(ptoEditExceptionResponsibleGroup);
+            customWait(2000);
+            scrollByElementVisibility(ptoEditExceptionResponsibleGroup);
+            customWait(2000);
+            setInputValue(ptoEditExceptionResponsibleGroupTextbox, ResponsibleGroupValue);
+            clickElement(ptoEditExceptionSubmitButton);
+            break;
+
+        case "PERFORMANCE":
+            // Steps for PERFORMANCE testing
+            setInputValue(ptoEditExceptionShortDescriptionTextbox, ShortDescription);
+            setInputValue(ptoEditExceptionDescriptionTextbox, Description);
+            setInputValue(ptoEditExceptionJustificationTextbox, Justification);
+            setInputValue(ptoEditExceptionAlternateSolutionTextbox, AlternateSolution);
+            setInputValue(ptoEditExceptionDeniedPolicyTextbox, DeniedPolicy);
+            setInputValue(ptoEditExceptionRatingFactorTextbox, RatingFactors);
+            clickElement(ptoEditExceptionPolicyWaiverTextbox);
+            clickElement(WaiverStatus.replace("oldWaiverEnterpriseWide", waiverEnterpriseWide));
+            AssertionLibrary.assertTrue(isDisplayed(ptoEditExceptionValidFromTextbox), "Valid From Date Validated");
+            DateSelector(ptoEditExceptionValidToTextbox, date, month, year);
+            clickElement(ptoEditExceptionViolationIdentification);
+            clickElement(ptoEditExceptionResponsibleGroup);
+            customWait(2000);
+            scrollByElementVisibility(ptoEditExceptionResponsibleGroup);
+            customWait(2000);
+            setInputValue(ptoEditExceptionResponsibleGroupTextbox, ResponsibleGroupValue);
+            clickElement(ptoEditExceptionSubmitButton);
+            break;
+
+        // Add more cases as needed
+        default:
+            AssertionLibrary.assertTrue(false, "Test case not recognized: " + CaseType);
+            break;
+    }
+}

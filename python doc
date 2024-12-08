@@ -1,0 +1,132 @@
+Setting Up Python, IntelliJ IDEA, and Robot Framework
+1. Python Installation
+1.1 Download and Install Python
+Go to the official Python website: Python.org.
+Download the latest version of Python for your operating system (Windows, macOS, or Linux).
+Run the installer:
+Windows: During installation, make sure to check the box that says "Add Python to PATH" before clicking "Install Now."
+macOS: Use the downloaded .pkg file and follow the on-screen instructions.
+Linux: Install Python using your package manager, e.g., sudo apt-get install python3 for Ubuntu.
+1.2 Verify Python Installation
+Open a terminal or command prompt.
+Run the command python --version or python3 --version.
+You should see the installed Python version number displayed.
+2. User Environment Configuration
+2.1 Setting Environment Variables (Windows)
+Right-click on "This PC" or "Computer" and select "Properties."
+Click on "Advanced system settings" and then on "Environment Variables."
+Under "System variables," find the Path variable, select it, and click "Edit."
+Add the path to the Python installation directory (e.g., C:\Python39 or C:\Users\YourUsername\AppData\Local\Programs\Python\Python39).
+Add the path to the Scripts folder within your Python installation directory (e.g., C:\Python39\Scripts).
+Click "OK" to save changes.
+2.2 Setting Environment Variables (macOS/Linux)
+Open a terminal.
+Edit your shell profile file (e.g., .bashrc, .zshrc, or .bash_profile):
+bash
+Copy code
+nano ~/.bashrc
+Add the following lines to the file:
+bash
+Copy code
+export PATH="/usr/local/bin/python3:$PATH"
+export PATH="/usr/local/bin:$PATH"
+Save the file and close the editor.
+Apply the changes by running source ~/.bashrc (or the equivalent for your shell).
+3. IntelliJ IDEA Setup
+3.1 Install IntelliJ IDEA
+Download IntelliJ IDEA from the JetBrains website.
+Install IntelliJ IDEA following the on-screen instructions.
+3.2 Configure Python in IntelliJ IDEA
+Open IntelliJ IDEA and create a new project or open an existing one.
+Go to File > Project Structure > Project Settings > Project.
+Under "Project SDK," click "New SDK" and select "Python SDK."
+Select the Python interpreter from your installed Python version.
+Click "Apply" and "OK" to save changes.
+3.3 Install Python Plugins
+Go to File > Settings > Plugins.
+Search for "Python" and install the Python plugin.
+Restart IntelliJ IDEA if prompted.
+3.4 Set Up Robot Framework in IntelliJ IDEA
+Open the terminal in IntelliJ IDEA (View > Tool Windows > Terminal).
+Install the Robot Framework:
+bash
+Copy code
+pip install robotframework
+Install the Intellibot plugin:
+Go to File > Settings > Plugins.
+Search for "Intellibot" and install the plugin.
+Restart IntelliJ IDEA if prompted.
+3.5 Create a Robot Framework Project
+Create a new Python project in IntelliJ IDEA.
+Create a new directory for your Robot Framework tests.
+Add a new file with a .robot extension.
+Write your Robot Framework test cases in this file.
+3.6 Run Robot Framework Tests
+Open a terminal in IntelliJ IDEA.
+Navigate to the directory containing your .robot files.
+Run the following command to execute your tests:
+bash
+Copy code
+robot <testfile.robot>
+4. Additional Configuration
+4.1 Virtual Environment Setup (Optional)
+Create a virtual environment for your project:
+bash
+Copy code
+python -m venv venv
+Activate the virtual environment:
+Windows: venv\Scripts\activate
+macOS/Linux: source venv/bin/activate
+Install necessary packages within the virtual environment.
+4.2 Installing Additional Python Packages
+Use pip to install any additional packages required for your project, such as requests, Selenium, etc.:
+bash
+Copy code
+pip install <package-name>
+This document covers the complete setup of Python, IntelliJ IDEA, and Robot Framework on your system. You can follow these steps to ensure that your development environment is properly configured and ready for Python and Robot Framework projects.
+
+
+
+
+
+
+
+3. PyCharm Setup
+3.1 Install PyCharm
+Download PyCharm from the JetBrains website.
+Install PyCharm following the on-screen instructions.
+3.2 Configure Python in PyCharm
+Open PyCharm and create a new project or open an existing one.
+Go to File > Settings > Project: <project name> > Python Interpreter.
+Click on the gear icon and select "Add Interpreter."
+Choose "Virtualenv Environment" or "System Interpreter" and select your Python installation.
+Click "OK" to save changes.
+3.3 Install Python Plugins
+Go to File > Settings > Plugins.
+Search for "Python" and install the Python plugin if it’s not already installed.
+Restart PyCharm if prompted.
+3.4 Set Up Robot Framework in PyCharm
+Open the terminal in PyCharm (View > Tool Windows > Terminal).
+Install the Robot Framework:
+bash
+Copy code
+pip install robotframework
+Install the Intellibot plugin for Robot Framework:
+Go to File > Settings > Plugins.
+Search for "Intellibot" and install the plugin.
+Restart PyCharm if prompted.
+
+
+
+4. Visual Studio Code (VSCode) Setup
+4.1 Install Visual Studio Code
+Download VSCode from the Visual Studio Code website.
+Install VSCode following the on-screen instructions.
+4.2 Install Python Extension
+Open VSCode.
+Go to the Extensions view by clicking on the Extensions icon in the Activity Bar or by pressing Ctrl+Shift+X.
+Search for "Python" and install the Python extension provided by Microsoft.
+4.3 Configure Python in VSCode
+Open VSCode and open a folder or create a new project.
+Open the Command Palette (Ctrl+Shift+P) and type Python: Select Interpreter.
+Select the Python interpreter that you installed earlier.

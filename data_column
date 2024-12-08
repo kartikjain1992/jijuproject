@@ -1,0 +1,119 @@
+import pandas as pd
+from concurrent.futures import ThreadPoolExecutor
+
+def fetch_data_chunk(file_path, sheet_name, offset, limit):
+    df = pd.read_excel(file_path, sheet_name=sheet_name, skiprows=offset, nrows=limit)
+    return df
+
+def find_unmatched_values(chunk_1, chunk_2, offset):
+    unmatched_in_chunk_1 = []
+    unmatched_in_chunk_2 = []
+
+    chunk_2_values = chunk_2.values.tolist()
+
+    for i, row in chunk_1.iterrows():
+        if row.values.tolist() not in chunk_2_values:
+            mismatched_columns = [chunk_1.columns[j] for j in range(len(row)) if j < len(chunk_2.columns) and row.iloc[j] != chunk_2.iloc[i, j]]
+            if mismatched_columns:
+                unmatched_in_chunk_1.append((offset + i, row.tolist(), mismatched_columns))
+
+    for i, row in chunk_2.iterrows():
+        if row.values.tolist() not in chunk_1.values.tolist():
+            mismatched_columns = [chunk_2.columns[j] for j in range(len(row)) if j < len(chunk_1.columns) and row.iloc[j] != chunk_1.iloc[i, j]]
+            if mismatched_columns:
+                unmatched_in_chunk_2.append((offset + i, row.tolist(), mismatched_columns))
+
+    return unmatched_in_chunk_1, unmatched_in_chunk_2
+
+def compare_column_headers(df1, df2):
+    columns_table_1 = set(df1.columns)
+    columns_table_2 = set(df2.columns)
+    mismatched_columns = columns_table_1.symmetric_difference(columns_table_2)
+    return list(mismatched_columns), len(mismatched_columns)
+
+def compare_data(file_path_1, file_path_2, sheet_name_1, sheet_name_2, chunk_size):
+    chunk_size = int(chunk_size)
+    df1 = pd.read_excel(file_path_1, sheet_name=sheet_name_1)
+    df2 = pd.read_excel(file_path_2, sheet_name=sheet_name_2)
+
+    mismatched_columns, total_mismatched_columns = compare_column_headers(df1, df2)
+    
+    total_rows_table_1 = len(df1)
+    total_rows_table_2 = len(df2)
+
+    unmatched_values_1 = []
+    unmatched_values_2 = []
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = []
+        for offset in range(0, max(total_rows_table_1, total_rows_table_2), chunk_size):
+            future_1 = executor.submit(fetch_data_chunk, file_path_1, sheet_name_1, offset, chunk_size)
+            future_2 = executor.submit(fetch_data_chunk, file_path_2, sheet_name_2, offset, chunk_size)
+            futures.append((future_1, future_2, offset))
+
+        for future_1, future_2, offset in futures:
+            chunk_1 = future_1.result()
+            chunk_2 = future_2.result()
+            
+            if not chunk_1.empty and not chunk_2.empty:
+                unmatched_in_chunk_1, unmatched_in_chunk_2 = find_unmatched_values(chunk_1, chunk_2, offset)
+                unmatched_values_1.extend(unmatched_in_chunk_1)
+                unmatched_values_2.extend(unmatched_in_chunk_2)
+
+    total_unmatched = len(unmatched_values_1) + len(unmatched_values_2)
+    summary = {
+        'total_rows_table_1': total_rows_table_1,
+        'total_rows_table_2': total_rows_table_2,
+        'total_rows_compared': min(total_rows_table_1, total_rows_table_2),
+        'total_unmatched_rows': total_unmatched,
+        'column_mismatches': mismatched_columns,
+        'total_column_mismatches': total_mismatched_columns
+    }
+
+    return unmatched_values_1, unmatched_values_2, summary
+
+def compare_excel_files(file_path_1, file_path_2, sheet_name_1, sheet_name_2, chunk_size):
+    unmatched_values_1, unmatched_values_2, summary = compare_data(file_path_1, file_path_2, sheet_name_1, sheet_name_2, chunk_size)
+    return {
+        'unmatched_in_table_1': unmatched_values_1,
+        'unmatched_in_table_2': unmatched_values_2,
+        'summary': summary
+    }
+
+
+
+*** Settings ***
+Library    ExcelComparisonLibrary.py
+
+*** Variables ***
+${FILE_PATH_1}    path/to/your/first/excel/file.xlsx
+${FILE_PATH_2}    path/to/your/second/excel/file.xlsx
+${SHEET_NAME_1}   Sheet1
+${SHEET_NAME_2}   Sheet2
+${CHUNK_SIZE}     1000
+
+*** Test Cases ***
+Compare Excel Files
+    ${result}    Compare Excel Files    ${FILE_PATH_1}    ${FILE_PATH_2}    ${SHEET_NAME_1}    ${SHEET_NAME_2}    ${CHUNK_SIZE}
+    Log    Unmatched in Table 1: ${result['unmatched_in_table_1']}
+    Log    Unmatched in Table 2: ${result['unmatched_in_table_2']}
+    Log    Summary: ${result['summary']}
+    Display Unmatched Details    ${result['unmatched_in_table_1']}    Table 1
+    Display Unmatched Details    ${result['unmatched_in_table_2']}    Table 2
+    Display Column Mismatches    ${result['summary']['column_mismatches']}    ${result['summary']['total_column_mismatches']}
+
+*** Keywords ***
+Display Unmatched Details
+    [Arguments]    ${unmatched_values}    ${table_name}
+    FOR    ${row}    IN    @{unmatched_values}
+        Log    ${table_name} - Row: ${row[0]}, Mismatched Columns: ${row[2]}, Values: ${row[1]}
+    END
+
+Display Column Mismatches
+    [Arguments]    ${column_mismatches}    ${total_mismatches}
+    Log    Mismatched Columns: ${column_mismatches}
+    Log    Total Number of Column Mismatches: ${total_mismatches}
+
+
+
+

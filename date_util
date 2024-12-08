@@ -1,0 +1,262 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
+import time
+from datetime import datetime
+
+
+def select_date(driver, date, format, date_picker_xpath):
+    # Identify the date format and parse accordingly
+    if format == "DDMMYYYY":
+        parsed_date = datetime.strptime(date, "%d%m%Y")
+    elif format == "MMDDYYYY":
+        parsed_date = datetime.strptime(date, "%m%d%Y")
+    else:
+        raise ValueError("Unsupported date format. Use DDMMYYYY or MMDDYYYY.")
+
+    # Extract day, month, and year
+    day = parsed_date.day
+    month = parsed_date.month - 1  # Selenium expects month to be 0-based
+    year = parsed_date.year
+
+    # Open the date picker using the passed XPath
+    date_picker = driver.find_element(By.XPATH, date_picker_xpath)
+    date_picker.click()
+
+    # Select the year
+    select_year(driver, year)
+
+    # Select the month
+    select_month(driver, month)
+
+    # Select the day
+    select_day(driver, day)
+
+
+def select_year(driver, year):
+    # Logic to select the year from the date picker
+    while True:
+        year_element = driver.find_element(By.CSS_SELECTOR, ".year-selector")  # Adjust locator as needed
+        displayed_year = int(year_element.text)
+        if displayed_year == year:
+            year_element.click()
+            break
+        elif displayed_year > year:
+            driver.find_element(By.CSS_SELECTOR, ".prev-year").click()
+        else:
+            driver.find_element(By.CSS_SELECTOR, ".next-year").click()
+
+
+def select_month(driver, month):
+    # Logic to select the month from the date picker
+    while True:
+        month_element = driver.find_element(By.CSS_SELECTOR, ".month-selector")  # Adjust locator as needed
+        displayed_month = get_month_number(month_element.text)
+
+        if displayed_month == month:
+            break
+        elif displayed_month > month:
+            driver.find_element(By.CSS_SELECTOR, ".prev-month").click()
+        else:
+            driver.find_element(By.CSS_SELECTOR, ".next-month").click()
+
+
+def select_day(driver, day):
+    # Logic to select the day from the date picker
+    day_element = driver.find_element(By.XPATH, f"//td[text()='{day}']")  # Adjust locator as needed
+    day_element.click()
+
+
+----------------------------------------------------------------------------------------------------------------------
+# date_util.py
+from datetime import datetime, timedelta
+
+def modify_date(date_str, days, operation='add'):
+    """
+    Modify the given date (in MMDDYYYY or DDMMYYYY format) by adding or subtracting the specified number of days.
+    
+    Parameters:
+    - date_str: String representation of the date (e.g., '09262023' or '26092023')
+    - days: Number of days to add or subtract
+    - operation: 'add' to add days, 'subtract' to subtract days
+    
+    Returns:
+    - Modified date as a string in the same format as input
+    """
+    try:
+        date_obj = datetime.strptime(date_str, '%m%d%Y')
+        date_format = '%m%d%Y'
+    except ValueError:
+        try:
+            date_obj = datetime.strptime(date_str, '%d%m%Y')
+            date_format = '%d%m%Y'
+        except ValueError:
+            raise ValueError("Date format must be either MMDDYYYY or DDMMYYYY.")
+    
+    if operation == 'add':
+        modified_date = date_obj + timedelta(days=days)
+    elif operation == 'subtract':
+        modified_date = date_obj - timedelta(days=days)
+    else:
+        raise ValueError("Invalid operation. Use 'add' or 'subtract'.")
+    
+    return modified_date.strftime(date_format)
+
+
+def get_month_number(month_name):
+    # Convert month name (e.g., "January") to month number (0-based)
+    return datetime.strptime(month_name, "%B").month - 1
+
+-----------------------------------------------------------------------------------------
+
+from datetime import datetime
+
+def get_current_date(keyword, date_format):
+    """
+    Return the current date in the specified format if the keyword is 'GetDate'.
+    
+    Parameters:
+    - keyword: String, should be 'GetDate' to trigger the date retrieval.
+    - date_format: String specifying the date format (e.g., 'DD/MM/YYYY', 'MM-DD-YYYY').
+    
+    Returns:
+    - Formatted current date as a string.
+    
+    Example:
+    get_current_date('GetDate', 'DD/MM/YYYY') -> '26/09/2024'
+    get_current_date('GetDate', 'MM-DD-YYYY') -> '09-26-2024'
+    """
+    if keyword != 'GetDate':
+        raise ValueError("Invalid keyword. Use 'GetDate' to get the current date.")
+    
+    # Map the custom date format to the format that strftime expects
+    format_map = {
+        'DD': '%d',
+        'MM': '%m',
+        'YYYY': '%Y'
+    }
+    
+    # Replace the format placeholders with strftime-compatible tokens
+    for placeholder, strftime_format in format_map.items():
+        date_format = date_format.replace(placeholder, strftime_format)
+    
+    # Get the current date and format it according to the provided date_format
+    current_date = datetime.now().strftime(date_format)
+    
+    return current_date
+
+----------------------------------------------------------------------------------------------------------------
+from datetime import datetime
+
+def return_today_date(date_format='yyyy-mm-dd'):
+    # Mapping the user input format to strftime placeholders
+    format_mapping = {
+        'DD': '%d',
+        'MMM': '%b',
+        'MM': '%m',
+        'YYYY': '%Y',
+        'YY': '%y',
+        'HH': '%H',
+        'MIN': '%M',
+        'SS': '%S',
+        # Add more mappings if needed
+    }
+    
+    # Convert the input format to uppercase to handle case-insensitive inputs
+    date_format = date_format.upper()
+    
+    # Replace the components in the format with their strftime equivalents
+    for key, value in format_mapping.items():
+        date_format = date_format.replace(key, value)
+    
+    # Get today's date and format it according to the processed format
+    return datetime.today().strftime(date_format)
+
+# Example usage
+print(return_today_date('dd-mmm-yyyy'))  # Returns today's date in 'DD-MMM-YYYY' format
+print(return_today_date('dd/mm/yyyy'))   # Returns today's date in 'DD/MM/YYYY' format
+print(return_today_date('yyyy/mm/dd hh:min:ss'))  # Returns today's date and time
+
+
+--------------------------------------------------------------------------------------------------------------------
+from datetime import datetime, timedelta
+from robot.api.deco import keyword
+
+class DateUtility:
+    
+    @keyword
+    def return_today_date(self, date_format):
+        """
+        Return today's date formatted according to the specified date format.
+        
+        Parameters:
+        - date_format: String specifying the desired date format (e.g., 'DD/MM/YYYY', 'MMM DD, YYYY').
+        
+        Returns:
+        - Formatted today's date as a string.
+        """
+        format_mapping = {
+            'DD': '%d',      # Day of the month (01-31)
+            'MMM': '%b',     # Abbreviated month name (Jan, Feb, etc.)
+            'MM': '%m',      # Month as a zero-padded decimal number (01-12)
+            'YYYY': '%Y',    # Year with century as a decimal number (2024)
+            'YY': '%y',      # Year without century as a zero-padded decimal number (24)
+            'HH': '%H',      # Hour (00-23)
+            'MIN': '%M',     # Minute (00-59)
+            'SS': '%S',      # Second (00-59)
+            # Add more mappings if needed
+        }
+
+        date_format = date_format.upper()
+        
+        # Replace the components in the format with their strftime equivalents
+        for key, value in format_mapping.items():
+            date_format = date_format.replace(key, value)
+        
+        # Get today's date and format it according to the processed format
+        return datetime.today().strftime(date_format)
+
+    @keyword
+    def return_tomorrow_date(self, date_format):
+        """
+        Return tomorrow's date formatted according to the specified date format.
+        
+        Parameters:
+        - date_format: String specifying the desired date format (e.g., 'DD/MM/YYYY', 'MMM DD, YYYY').
+        
+        Returns:
+        - Formatted tomorrow's date as a string.
+        """
+        format_mapping = {
+            'DD': '%d',      # Day of the month (01-31)
+            'MMM': '%b',     # Abbreviated month name (Jan, Feb, etc.)
+            'MM': '%m',      # Month as a zero-padded decimal number (01-12)
+            'YYYY': '%Y',    # Year with century as a decimal number (2024)
+            'YY': '%y',      # Year without century as a zero-padded decimal number (24)
+            'HH': '%H',      # Hour (00-23)
+            'MIN': '%M',     # Minute (00-59)
+            'SS': '%S',      # Second (00-59)
+            # Add more mappings if needed
+        }
+
+        date_format = date_format.upper()
+        
+        # Replace the components in the format with their strftime equivalents
+        for key, value in format_mapping.items():
+            date_format = date_format.replace(key, value)
+        
+        # Get tomorrow's date and format it according to the processed format
+        tomorrow_date = datetime.today() + timedelta(days=1)
+        return tomorrow_date.strftime(date_format)
+
+# Example Usage
+if __name__ == "__main__":
+    date_util = DateUtility()
+    print(date_util.return_today_date('DD/MM/YYYY'))    # Example output: '01/10/2024'
+    print(date_util.return_today_date('MMM DD, YYYY'))   # Example output: 'Oct 01, 2024'
+    print(date_util.return_tomorrow_date('DD/MM/YYYY'))  # Example output: '02/10/2024'
+    print(date_util.return_tomorrow_date('MMM DD, YYYY')) # Example output: 'Oct 02, 2024'
+
+

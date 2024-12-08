@@ -1,0 +1,70 @@
+import pandas as pd
+from concurrent.futures import ThreadPoolExecutor
+
+def fetch_data_chunk(file_path, sheet_name, offset, limit):
+    df = pd.read_excel(file_path, sheet_name=sheet_name, skiprows=offset, nrows=limit)
+    return df.values.tolist()
+
+def find_unmatched_values(chunk_1, chunk_2):
+    unmatched_in_chunk_1 = [row for row in chunk_1 if row not in chunk_2]
+    unmatched_in_chunk_2 = [row for row in chunk_2 if row not in chunk_1]
+    return unmatched_in_chunk_1, unmatched_in_chunk_2
+
+def compare_data(file_path_1, file_path_2, sheet_name_1, sheet_name_2, chunk_size):
+    chunk_size = int(chunk_size)
+    total_rows_table_1 = len(pd.read_excel(file_path_1, sheet_name=sheet_name_1))
+    total_rows_table_2 = len(pd.read_excel(file_path_2, sheet_name=sheet_name_2))
+
+    unmatched_values_1 = []
+    unmatched_values_2 = []
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = []
+        for offset in range(0, max(total_rows_table_1, total_rows_table_2), chunk_size):
+            future_1 = executor.submit(fetch_data_chunk, file_path_1, sheet_name_1, offset, chunk_size)
+            future_2 = executor.submit(fetch_data_chunk, file_path_2, sheet_name_2, offset, chunk_size)
+            futures.append((future_1, future_2))
+
+        for future_1, future_2 in futures:
+            chunk_1 = future_1.result()
+            chunk_2 = future_2.result()
+            unmatched_in_chunk_1, unmatched_in_chunk_2 = find_unmatched_values(chunk_1, chunk_2)
+            unmatched_values_1.extend(unmatched_in_chunk_1)
+            unmatched_values_2.extend(unmatched_in_chunk_2)
+
+    total_unmatched = len(unmatched_values_1) + len(unmatched_values_2)
+    summary = {
+        'total_rows_table_1': total_rows_table_1,
+        'total_rows_table_2': total_rows_table_2,
+        'total_rows_compared': min(total_rows_table_1, total_rows_table_2),
+        'total_unmatched_rows': total_unmatched
+    }
+
+    return unmatched_values_1, unmatched_values_2, summary
+
+def compare_excel_files(file_path_1, file_path_2, sheet_name_1, sheet_name_2, chunk_size):
+    unmatched_values_1, unmatched_values_2, summary = compare_data(file_path_1, file_path_2, sheet_name_1, sheet_name_2, chunk_size)
+    return {
+        'unmatched_in_table_1': unmatched_values_1,
+        'unmatched_in_table_2': unmatched_values_2,
+        'summary': summary
+    }
+
+
+
+
+*** Settings ***
+Library    excel_comparison.py
+
+*** Test Cases ***
+Compare Two Excel Files
+    [Documentation]    Compare two Excel files and list unmatched values, along with a summary of the execution.
+    [Tags]    Compare
+    ${result}    Compare Excel Files    file1.xlsx    file2.xlsx    Sheet1    Sheet2    50
+    Log    Unmatched rows in Table 1: ${result['unmatched_in_table_1']}
+    Log    Unmatched rows in Table 2: ${result['unmatched_in_table_2']}
+    Log    Summary: ${result['summary']}
+    Log    Total Rows in Table 1: ${result['summary']['total_rows_table_1']}
+    Log    Total Rows in Table 2: ${result['summary']['total_rows_table_2']}
+    Log    Total Rows Compared: ${result['summary']['total_rows_compared']}
+    Log    Total Unmatched Rows: ${result['summary']['total_unmatched_rows']}

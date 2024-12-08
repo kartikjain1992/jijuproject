@@ -1,0 +1,98 @@
+import pandas as pd
+from concurrent.futures import ThreadPoolExecutor
+
+# Function to fetch data from the first Excel sheet in chunks
+def fetch_data_chunk(file_path, sheet_name, offset, limit):
+    df = pd.read_excel(file_path, sheet_name=sheet_name, skiprows=offset, nrows=limit)
+    return df.values.tolist()
+
+# Function to fetch data from the second Excel sheet in chunks
+def fetch_data_chunk_2(file_path, sheet_name, offset, limit):
+    df = pd.read_excel(file_path, sheet_name=sheet_name, skiprows=offset, nrows=limit)
+    return df.values.tolist()
+
+# Function to find unmatched column values
+def find_unmatched_values(chunk_1, chunk_2):
+    unmatched_values = []
+    for row in chunk_1:
+        if row not in chunk_2:
+            unmatched_values.append(row)
+    return unmatched_values
+
+if __name__ == "__main__":
+    file_path_1 = "path_to_excel_file_1.xlsx"
+    file_path_2 = "path_to_excel_file_2.xlsx"
+    sheet_name_1 = "Sheet1"  # Name of the sheet in the first Excel file
+    sheet_name_2 = "Sheet1"  # Name of the sheet in the second Excel file
+    chunk_size = 500  # Number of rows to fetch at a time
+
+    # Read the first few rows to get the total number of rows in the sheets
+    total_rows_table_1 = len(pd.read_excel(file_path_1, sheet_name=sheet_name_1))
+    total_rows_table_2 = len(pd.read_excel(file_path_2, sheet_name=sheet_name_2))
+
+    # Use multithreading to fetch data in chunks
+    unmatched_values = []
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = []
+        for offset in range(0, max(total_rows_table_1, total_rows_table_2), chunk_size):
+            future_1 = executor.submit(fetch_data_chunk, file_path_1, sheet_name_1, offset, chunk_size)
+            future_2 = executor.submit(fetch_data_chunk_2, file_path_2, sheet_name_2, offset, chunk_size)
+            chunk_1 = future_1.result()
+            chunk_2 = future_2.result()
+            futures.append((chunk_1, chunk_2))
+
+        for chunk_1, chunk_2 in futures:
+            unmatched_values.extend(find_unmatched_values(chunk_1, chunk_2))
+
+    # Output unmatched values
+    for row in unmatched_values:
+        print(row)
+    print("Total Unmatched Count", len(unmatched_values))
+-----------------------------------------------------------------------------------------------------------------------
+import pandas as pd
+
+# Load the Excel file once and store each sheet's data in a dictionary
+excel_path = "/mnt/data/testData.xlsx"
+excel_data = pd.read_excel(excel_path, sheet_name=None)  # Load all sheets at once
+
+def get_data(scenario_name, sheetname, column_name):
+    # Access the specified sheet and convert to a dictionary
+    if sheetname in excel_data:
+        reader = excel_data[sheetname].to_dict()
+    else:
+        raise ValueError(f"Sheet '{sheetname}' not found in the Excel file.")
+
+    # Get the count of TestDataID keys
+    scenarios_in_datasheet = len(reader['TestDataID'].keys())
+    
+    # Loop through scenarios in the data sheet
+    for i in range(scenarios_in_datasheet):
+        # Check if the TestDataID matches the scenario_name
+        if str(reader['TestDataID'].get(i)).lstrip() in scenario_name.split('*-*')[0].strip():
+            # Return the value from the specified column
+            return reader.get(column_name, {}).get(i)
+    
+    # If no match is found, return None or raise an exception
+    return None
+--------------------------------------------------------------------------------------------------------------
+import pandas as pd
+
+def get_data(scenario_name, path, sheetname, column_name):
+    # Read the Excel file and convert to a dictionary
+    reader = pd.read_excel(path, sheet_name=sheetname).to_dict()
+    
+    # Get the count of TestDataID keys
+    scenarios_in_datasheet = len(reader['TestDataID'].keys())
+    
+    # Loop through scenarios in the data sheet
+    for i in range(scenarios_in_datasheet):
+        # Check if the TestDataID matches the scenario_name
+        if str(reader['TestDataID'].get(i)).lstrip() in scenario_name.split('*-*')[0].strip():
+            # Return the value from the specified column
+            return reader.get(column_name, {}).get(i)
+
+    # If no match is found, return None or raise an exception
+    return None
+
+
+

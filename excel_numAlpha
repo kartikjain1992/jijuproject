@@ -1,0 +1,41 @@
+class ExcelColumnLibrary:
+    
+    def excel_column_to_number(self, column):
+        result = 0
+        for char in column:
+            result = result * 26 + (ord(char.upper()) - ord('A') + 1)
+        return result
+
+    def number_to_excel_column(self, number):
+        result = ''
+        while number > 0:
+            number -= 1
+            result = chr(number % 26 + ord('A')) + result
+            number //= 26
+        return result
+
+
+
+
+*** Settings ***
+Library    ExcelColumnLibrary.py
+Variables  variables.py
+
+*** Variables ***
+${COLUMN}    AC
+${NUMBER}    29
+
+*** Test Cases ***
+Convert Excel Column To Number
+    [Arguments]    ${column}
+    ${number}=    Excel Column To Number    ${column}
+    Log    The number for column ${column} is ${number}
+
+Convert Number To Excel Column
+    [Arguments]    ${number}
+    ${column}=    Number To Excel Column    ${number}
+    Log    The column for number ${number} is ${column}
+
+
+
+robot --variable COLUMN:BA --variable NUMBER:53 ExcelColumnParameterizedTest.robot

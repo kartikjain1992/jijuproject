@@ -1,0 +1,980 @@
+import csv
+import PyPDF2
+
+# Path to the PDF file
+pdf_path = "C:\\Users\\Admin\\Downloads\\wordpress-pdf-invoice-plugin-sample.pdf"
+
+
+# Read PDF
+def read_pdf(pdf_path):
+    with open(pdf_path, 'rb') as file:
+        reader = PyPDF2.PdfReader(file)
+        text = ''
+        for page in reader.pages:
+            text += page.extract_text()
+        return text
+
+
+# Extract relevant data
+def extract_data(pdf_text):
+    from_address = ""
+    to_address = ""
+    invoice_number = ""
+    order_number = ""
+    invoice_date = ""
+    due_date = ""
+    total_due = ""
+
+    lines = pdf_text.split('\n')
+
+    for i, line in enumerate(lines):
+        if line.startswith('From:'):
+            from_address = ' '.join(lines[i + 1:i + 4])
+        elif line.startswith('To:'):
+            to_address = ' '.join(lines[i + 1:i + 4])
+        elif 'Invoice Number' in line:
+            invoice_number = line.split()[-1]
+        elif 'Order Number' in line:
+            order_number = line.split()[-1]
+        elif 'Invoice Date' in line:
+            invoice_date = ' '.join(line.split()[2:])
+        elif 'Due Date' in line:
+            due_date = ' '.join(line.split()[2:])
+        elif 'Total Due' in line:
+            total_due = line.split()[-1]
+
+    return {
+        'from_address': from_address,
+        'to_address': to_address,
+        'invoice_number': invoice_number,
+        'order_number': order_number,
+        'invoice_date': invoice_date,
+        'due_date': due_date,
+        'total_due': total_due
+    }
+
+
+# Write to CSV
+def write_to_csv(data, output_file):
+    with open(output_file, mode='w', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=['From Address', 'To Address', 'Invoice Number', 'Order Number',
+                                                  'Invoice Date', 'Due Date', 'Total Due'])
+        writer.writeheader()
+        writer.writerow({
+            'From Address': data['from_address'],
+            'To Address': data['to_address'],
+            'Invoice Number': data['invoice_number'],
+            'Order Number': data['order_number'],
+            'Invoice Date': data['invoice_date'],
+            'Due Date': data['due_date'],
+            'Total Due': data['total_due']
+        })
+
+
+# Main function to execute
+pdf_text = read_pdf(pdf_path)
+extracted_data = extract_data(pdf_text)
+output_csv_path = "C:\\Users\\Admin\\Downloads\\invoice_data.csv"
+write_to_csv(extracted_data, output_csv_path)
+
+print(f'Data successfully extracted and written to {output_csv_path}')
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------
+
+
+import csv
+import PyPDF4
+import logging
+import os
+
+# Configure logging
+logging.basicConfig(
+    filename='pdf_extractor.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+# Path to the PDF file
+pdf_path = '/mnt/data/wordpress-pdf-invoice-plugin-sample.pdf'
+
+# Read PDF using PyPDF4
+def read_pdf(pdf_path):
+    try:
+        with open(pdf_path, 'rb') as file:
+            reader = PyPDF4.PdfFileReader(file)
+            text = ''
+            for page_num in range(reader.numPages):
+                page = reader.getPage(page_num)
+                text += page.extract_text()
+            logging.info(f'Successfully read PDF: {pdf_path}')
+            return text
+    except FileNotFoundError:
+        logging.error(f'File not found: {pdf_path}')
+        raise
+    except Exception as e:
+        logging.error(f'Error reading PDF file: {e}')
+        raise
+
+# Extract relevant data dynamically
+def extract_data(pdf_text, fields_to_extract=None):
+    try:
+        # If no fields are provided, return the plain text of the PDF
+        if fields_to_extract is None or len(fields_to_extract) == 0:
+            logging.info('No fields passed, extracting plain text.')
+            return {'plain_text': pdf_text}
+        
+        # Initialize dictionary with required fields
+        data = {field: '' for field in fields_to_extract}
+        
+        # Split PDF text into lines
+        lines = pdf_text.split('\n')
+
+        # Extract specific fields if requested
+        for i, line in enumerate(lines):
+            if 'from_address' in fields_to_extract and line.startswith('From:'):
+                data['from_address'] = ' '.join(lines[i+1:i+4])
+            elif 'to_address' in fields_to_extract and line.startswith('To:'):
+                data['to_address'] = ' '.join(lines[i+1:i+4])
+            elif 'invoice_number' in fields_to_extract and 'Invoice Number' in line:
+                data['invoice_number'] = line.split()[-1]
+            elif 'order_number' in fields_to_extract and 'Order Number' in line:
+                data['order_number'] = line.split()[-1]
+            elif 'invoice_date' in fields_to_extract and 'Invoice Date' in line:
+                data['invoice_date'] = ' '.join(line.split()[2:])
+            elif 'due_date' in fields_to_extract and 'Due Date' in line:
+                data['due_date'] = ' '.join(line.split()[2:])
+            elif 'total_due' in fields_to_extract and 'Total Due' in line:
+                data['total_due'] = line.split()[-1]
+        
+        logging.info(f'Successfully extracted fields: {fields_to_extract}')
+        return data
+    except Exception as e:
+        logging.error(f'Error extracting data: {e}')
+        raise
+
+# Write to CSV dynamically
+def write_to_csv(data, output_file):
+    try:
+        # If plain text is extracted, write a single column
+        if 'plain_text' in data:
+            with open(output_file, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(['Plain Text'])
+                writer.writerow([data['plain_text']])
+        else:
+            # Otherwise, write specified fields to the CSV
+            fieldnames = [key for key in data if data[key]]
+            with open(output_file, mode='w', newline='') as file:
+                writer = csv.DictWriter(file, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerow(data)
+
+        logging.info(f'Data successfully written to CSV: {output_file}')
+    except PermissionError:
+        logging.error(f'Permission denied: Unable to write to {output_file}')
+        raise
+    except Exception as e:
+        logging.error(f'Error writing to CSV: {e}')
+        raise
+
+# Main function to execute
+def main():
+    try:
+        # Check if the PDF file exists before proceeding
+        if not os.path.exists(pdf_path):
+            logging.error(f'The file {pdf_path} does not exist.')
+            return
+        
+        # Read the PDF content
+        pdf_text = read_pdf(pdf_path)
+
+        # Example 1: No parameters passed, extract plain text
+        fields_to_extract = []  # If no parameters are passed, leave this empty
+
+        # Example 2: Pass specific fields to extract (Uncomment to use this)
+        # fields_to_extract = ['from_address', 'to_address', 'invoice_number']
+
+        # Extract data based on parameters
+        extracted_data = extract_data(pdf_text, fields_to_extract)
+
+        # Output file path
+        output_csv_path = '/mnt/data/invoice_data_dynamic.csv'
+
+        # Write extracted data to CSV
+        write_to_csv(extracted_data, output_csv_path)
+
+        logging.info(f'Process completed successfully. Data written to {output_csv_path}')
+        print(f'Data successfully extracted and written to {output_csv_path}')
+
+    except Exception as e:
+        logging.error(f'Error in the main process: {e}')
+        print(f"An error occurred: {e}")
+
+# Run the main function
+if __name__ == '__main__':
+    main()
+
+------------------------------------------------------------------------------------------------------------------------------------
+import csv
+import PyPDF2
+import logging
+import os
+
+# Set up logging configuration
+logging.basicConfig(filename='pdf_extractor.log',
+                    level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Combine everything into one method
+def extract_pdf_to_csv(pdf_path, output_csv_path, fields_to_extract=None):
+    # Check if the PDF file exists
+    if not os.path.exists(pdf_path):
+        logging.error(f"File not found: {pdf_path}")
+        raise FileNotFoundError(f"The file {pdf_path} does not exist.")
+
+    try:
+        # Step 1: Read the PDF
+        with open(pdf_path, 'rb') as file:
+            reader = PyPDF2.PdfReader(file)
+            text = ''
+            for page in reader.pages:
+                text += page.extract_text()
+            logging.info(f"Successfully read PDF file: {pdf_path}")
+
+        # Step 2: Extract data based on fields_to_extract
+        if fields_to_extract is None:
+            # If no fields specified, return the entire text content
+            extracted_data = {'text': text}
+            logging.info("No specific fields provided. Extracting full PDF content.")
+        else:
+            # Extract specific fields from the PDF text
+            extracted_data = {}
+            lines = text.split('\n')
+
+            # Variables to store extracted data
+            from_address = ""
+            to_address = ""
+            invoice_number = ""
+            order_number = ""
+            invoice_date = ""
+            due_date = ""
+            total_due = ""
+
+            # Loop through the text to find and extract the necessary fields
+            for i, line in enumerate(lines):
+                if 'from_address' in fields_to_extract and line.startswith('From:'):
+                    from_address = ' '.join(lines[i + 1:i + 4])
+                if 'to_address' in fields_to_extract and line.startswith('To:'):
+                    to_address = ' '.join(lines[i + 1:i + 4])
+                if 'invoice_number' in fields_to_extract and 'Invoice Number' in line:
+                    invoice_number = line.split()[-1]
+                if 'order_number' in fields_to_extract and 'Order Number' in line:
+                    order_number = line.split()[-1]
+                if 'invoice_date' in fields_to_extract and 'Invoice Date' in line:
+                    invoice_date = ' '.join(line.split()[2:])
+                if 'due_date' in fields_to_extract and 'Due Date' in line:
+                    due_date = ' '.join(line.split()[2:])
+                if 'total_due' in fields_to_extract and 'Total Due' in line:
+                    total_due = line.split()[-1]
+
+            # Store extracted fields in the dictionary
+            if 'from_address' in fields_to_extract:
+                extracted_data['from_address'] = from_address
+            if 'to_address' in fields_to_extract:
+                extracted_data['to_address'] = to_address
+            if 'invoice_number' in fields_to_extract:
+                extracted_data['invoice_number'] = invoice_number
+            if 'order_number' in fields_to_extract:
+                extracted_data['order_number'] = order_number
+            if 'invoice_date' in fields_to_extract:
+                extracted_data['invoice_date'] = invoice_date
+            if 'due_date' in fields_to_extract:
+                extracted_data['due_date'] = due_date
+            if 'total_due' in fields_to_extract:
+                extracted_data['total_due'] = total_due
+
+            logging.info(f"Successfully extracted specific fields: {extracted_data}")
+
+        # Step 3: Write extracted data to CSV
+        with open(output_csv_path, mode='w', newline='') as file:
+            if fields_to_extract is None:
+                # Write full content to the CSV
+                writer = csv.writer(file)
+                writer.writerow(['Full PDF Content'])
+                writer.writerow([extracted_data['text']])  # Write full text content
+            else:
+                # Write only the extracted fields
+                writer = csv.DictWriter(file, fieldnames=fields_to_extract)
+                writer.writeheader()
+                writer.writerow({field: extracted_data.get(field, '') for field in fields_to_extract})
+
+        logging.info(f"Data successfully written to CSV: {output_csv_path}")
+        print(f"Data successfully extracted and written to {output_csv_path}")
+
+    except Exception as e:
+        logging.error(f"An error occurred: {str(e)}")
+        print(f"An error occurred: {e}")
+        raise
+
+# Example usage:
+# If fields_to_extract is None, it will extract the full PDF content.
+pdf_path = "C:\\Users\\Admin\\Downloads\\wordpress-pdf-invoice-plugin-sample.pdf"
+output_csv_path = "C:\\Users\\Admin\\Downloads\\full_pdf_content.csv"
+
+# Example with no fields (extracts the full content)
+extract_pdf_to_csv(pdf_path, output_csv_path, fields_to_extract=['from_address', 'to_address', 'invoice_number'])
+
+# Example with specific fields (e.g., from_address, to_address)
+# fields_to_extract = ['from_address', 'to_address']
+# extract_pdf_to_csv(pdf_path, output_csv_path, fields_to_extract)
+
+------------------------------------------------------------------------------------------------------------------------------
+
+import csv
+import PyPDF2
+import logging
+
+# Configure logging
+logging.basicConfig(
+    filename="pdf_processing.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+def process_pdf(pdf_path, output_csv_path, fields=None):
+    """
+    Processes a PDF to extract specific fields and write them to a CSV.
+    If no fields are specified, writes the full PDF text to the CSV.
+
+    :param pdf_path: Path to the input PDF file.
+    :param output_csv_path: Path to the output CSV file.
+    :param fields: List of fields to extract and write. 
+                   If None, writes the full PDF text.
+                   Possible fields: 'From Address', 'To Address', 'Invoice Number',
+                                   'Order Number', 'Invoice Date', 'Due Date', 'Total Due'
+    """
+    try:
+        # Step 1: Read PDF
+        with open(pdf_path, 'rb') as file:
+            reader = PyPDF2.PdfReader(file)
+            text = ''
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text
+            logging.info(f"Successfully read PDF: {pdf_path}")
+        
+        # Step 2: Extract Data
+        extracted_data = {}
+        if fields:
+            # Initialize all possible fields
+            data_keys = {
+                'From Address': '',
+                'To Address': '',
+                'Invoice Number': '',
+                'Order Number': '',
+                'Invoice Date': '',
+                'Due Date': '',
+                'Total Due': ''
+            }
+
+            lines = text.split('\n')
+            for i, line in enumerate(lines):
+                if 'From:' in line and 'From Address' in fields:
+                    data_keys['From Address'] = ' '.join(lines[i + 1:i + 4]).strip()
+                elif 'To:' in line and 'To Address' in fields:
+                    data_keys['To Address'] = ' '.join(lines[i + 1:i + 4]).strip()
+                elif 'Invoice Number' in line and 'Invoice Number' in fields:
+                    data_keys['Invoice Number'] = line.split()[-1].strip()
+                elif 'Order Number' in line and 'Order Number' in fields:
+                    data_keys['Order Number'] = line.split()[-1].strip()
+                elif 'Invoice Date' in line and 'Invoice Date' in fields:
+                    data_keys['Invoice Date'] = ' '.join(line.split()[2:]).strip()
+                elif 'Due Date' in line and 'Due Date' in fields:
+                    data_keys['Due Date'] = ' '.join(line.split()[2:]).strip()
+                elif 'Total Due' in line and 'Total Due' in fields:
+                    data_keys['Total Due'] = line.split()[-1].strip()
+            
+            # Filter only the requested fields
+            for key in fields:
+                extracted_data[key] = data_keys.get(key, '')
+            
+            logging.info("Data extraction successful for specified fields.")
+        else:
+            # No specific fields requested, include full text
+            extracted_data['Full Text'] = text
+            logging.info("No specific fields provided. Full PDF text will be written.")
+        
+        # Step 3: Write to CSV
+        with open(output_csv_path, mode='w', newline='', encoding='utf-8') as file:
+            if fields:
+                # Write only the specified fields
+                writer = csv.DictWriter(file, fieldnames=fields)
+                writer.writeheader()
+                writer.writerow(extracted_data)
+            else:
+                # Write the full text
+                writer = csv.writer(file)
+                writer.writerow(['Full Text'])
+                writer.writerow([extracted_data['Full Text']])
+        
+        logging.info(f"Data successfully written to CSV: {output_csv_path}")
+        print(f"Data successfully extracted and written to {output_csv_path}")
+
+    except FileNotFoundError as e:
+        logging.error(f"File not found: {pdf_path} - {e}")
+        print(f"Error: File not found - {e}")
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        print(f"An error occurred: {e}")
+
+# Example Usage
+if __name__ == "__main__":
+    pdf_path = "C:\\Users\\Admin\\Downloads\\wordpress-pdf-invoice-plugin-sample.pdf"
+    output_csv_path = "C:\\Users\\Admin\\Downloads\\invoice_data.csv"
+    
+    # Specify the fields you want to extract. If None, full text will be written.
+    fields_to_extract = [
+        'From Address',
+        'To Address',
+        'Invoice Number',
+        'Order Number',
+        'Invoice Date',
+        'Due Date',
+        'Total Due'
+    ]
+    
+    # Call the process_pdf function with specified fields
+    process_pdf(pdf_path, output_csv_path, fields=fields_to_extract)
+    
+    # To write the full text instead, call without the fields parameter:
+    # process_pdf(pdf_path, output_csv_path)
+
+---------------------------------------------------------------------------------------------------------------------
+
+import csv
+import json
+import PyPDF2
+import logging
+import re
+
+# Configure logging
+logging.basicConfig(
+    filename="pdf_processing.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+
+def process_pdf(pdf_path, output_path, fields=None, output_format="CSV"):
+    """
+    Processes a PDF to extract specific fields and write them to CSV or JSON.
+
+    :param pdf_path: Path to the input PDF file.
+    :param output_path: Path to the output file (either CSV or JSON).
+    :param fields: Dictionary of fields to extract and the number of lines for each field.
+                   If the value is 1, extracts from the same line using split().
+                   If the value is > 1, extracts that many lines after the field.
+                   If the value is 0, extracts just the next line after the field.
+                   If the value is 2, uses a specific extraction method for 'Due Date'.
+                   Example: {'From Address': 4, 'Invoice Number': 1, 'Hrs/Qty': 0, 'Due Date': 2}.
+    :param output_format: The format in which to write the output, either 'CSV' or 'JSON'.
+    """
+    try:
+        # Step 1: Read PDF
+        with open(pdf_path, 'rb') as file:
+            reader = PyPDF2.PdfReader(file)
+            text = ''
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text
+        logging.info(f"Successfully read PDF: {pdf_path}")
+
+        # Step 2: Extract Data
+        extracted_data = {}
+
+        if fields:
+            # Split the PDF text into lines
+            lines = text.split('\n')
+
+            for field, num_lines in fields.items():
+                extracted_data[field] = ''  # Initialize field value to empty
+
+                # Search for the field in the PDF text
+                for i, line in enumerate(lines):
+                    if field in line:
+                        if num_lines == 1:
+                            # If num_lines is 1, extract from the same line using split
+                            extracted_data[field] = line.split()[-1].strip()
+                        elif num_lines == 0:
+                            # If num_lines is 0, extract just the next line, but only capture numeric part (Hrs/Qty)
+                            next_line = lines[i + 1].strip()
+                            match = re.search(r'\d+(\.\d+)?', next_line)  # Extract numbers with optional decimal
+                            if match:
+                                extracted_data[field] = match.group(0)
+                            else:
+                                extracted_data[field] = next_line  # Default if no match found
+                        elif num_lines == 2:
+                            # If num_lines is 2, use the specific extraction method for 'Due Date'
+                            extracted_data[field] = ' '.join(line.split()[2:]).strip()
+                        else:
+                            # If num_lines is greater than 2, extract multiple lines
+                            extracted_data[field] = ' '.join(lines[i + 1:i + 1 + num_lines]).strip()
+                        break  # Exit loop after finding the field
+
+        else:
+            # No specific fields requested, include full text
+            extracted_data['Full Text'] = text
+        logging.info("Data extraction successful.")
+
+        # Step 3: Write to CSV or JSON based on the output format
+        if output_format.upper() == "CSV":
+            with open(output_path, mode='w', newline='', encoding='utf-8') as file:
+                if fields:
+                    writer = csv.DictWriter(file, fieldnames=fields.keys())
+                    writer.writeheader()
+                    writer.writerow(extracted_data)
+                else:
+                    writer = csv.writer(file)
+                    writer.writerow(['Full Text'])
+                    writer.writerow([extracted_data['Full Text']])
+            logging.info(f"Data successfully written to CSV: {output_path}")
+
+        elif output_format.upper() == "JSON":
+            with open(output_path, mode='w', encoding='utf-8') as file:
+                json.dump(extracted_data, file, indent=4)
+            logging.info(f"Data successfully written to JSON: {output_path}")
+
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        print(f"An error occurred: {e}")
+
+
+# Example usage:
+if __name__ == "__main__":
+    pdf_path = "C:\\Users\\Admin\\Downloads\\wordpress-pdf-invoice-plugin-sample.pdf"
+    output_path = "C:\\Users\\Admin\\Downloads\\file.json"  # Change to CSV or JSON output file
+    fields_to_extract = {
+        'From Address': 4,  # Extract 4 lines after 'From Address'
+        'To Address': 3,  # Extract 3 lines after 'To Address'
+        'Invoice Number': 1,  # Extract 1 line for 'Invoice Number'
+        'Hrs/Qty': 0,  # Extract the next line for 'Hrs/Qty', but only the numeric part
+        'Due Date': 2  # Extract from the line after the field's name, using a specific method for 'Due Date'
+    }
+    process_pdf(pdf_path, output_path, fields=fields_to_extract, output_format="JSON")
+
+
+-----------------------------------------------------------------------------------------------------------------------------
+
+import csv
+import json
+import logging
+import fitz
+
+import pymupdf # import PyMuPDF
+
+
+# Configure logging
+logging.basicConfig(
+    filename="pdf_processing.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+
+def process_pdf(pdf_path, output_path, field=None, value=None, output_format="CSV"):
+    """
+    Processes a PDF to extract specific fields and write them to CSV or JSON.
+
+    :param pdf_path: Path to the input PDF file.
+    :param output_path: Path to the output file (either CSV or JSON).
+    :param field: key from fields_to_extract_dictionary.
+    :param value: value from fields_to_extract_dictionary
+
+    :param output_format: The format in which to write the output, either 'CSV' or 'JSON'.
+    """
+    extracted_data = {}
+    try:
+
+            page_number=value[0]-1
+            data_type=value[1]
+            doc = pymupdf.open(pdf_path)  # open a supported document
+            page = doc[page_number].get_textpage()  # load the required page (0-based index)
+
+
+            doc = fitz.open(pdf_path)
+            if data_type == 'Text':
+                data = page.extractJSON()
+                json1_data = json.loads(data)
+                #print(type(json1_data['blocks']),json1_data['blocks'][0])
+                for b in json1_data['blocks']:  # iterate through the text blocks
+                    for l in b["lines"]:  # iterate through the text lines
+                        for s in l["spans"]:  # iterate through the text spans
+
+                            if  s['text'] == field:
+                                bbox=b['bbox']
+                                print(s)
+                                for page_num, page in enumerate(doc.pages()):
+                                    print(page.get_textbox(bbox))
+                                    extracted_data=page.get_textbox(bbox)
+                                    extracted_data = [line.strip() for line in extracted_data.strip().split('\n')]
+
+                #for field in page.widgets():
+                    #print(field)
+                    #pass
+                #print(extracted_data)
+                #for field, num_lines in fields.items():
+                 #   extracted_data[field] = ''  # Initialize field value to empty
+
+                # Search for the field in the PDF text
+                #for i, line in enumerate(lines):
+                 #   if field in line:
+
+            elif data_type == 'Table':
+                #Get all the tables from particular page
+                tabs = page.find_tables()
+                for tab in tabs:
+                    #Just for seeing the data
+                    #for line in tab.extract():  # print cell text for each row
+                        #print(line)
+
+                    #convert the tables to dataframe(Table format)
+                    df=tab.to_pandas()
+                    #add each table to the list for further processing
+                    extracted_data.update(df.to_dict())
+
+                print(extracted_data)
+    except Exception as e:
+        print(e)
+
+        # Step 3: Write to CSV or JSON based on the output format
+    if output_format.upper() == "CSV":
+            with open(output_path, mode='w', newline='', encoding='utf-8') as file:
+                if field:
+                    writer = csv.DictWriter(file, fieldnames=field)
+                    writer.writeheader()
+                    writer.writerow(extracted_data)
+                else:
+                    writer = csv.writer(file)
+                    writer.writerow(['Full Text'])
+                    writer.writerow([extracted_data['Full Text']])
+            logging.info(f"Data successfully written to CSV: {output_path}")
+
+    elif output_format.upper() == "JSON":
+            with open(output_path, mode='w', encoding='utf-8') as file:
+                json.dump(extracted_data, file, indent=4)
+            logging.info(f"Data successfully written to JSON: {output_path}")
+# Example usage:
+if __name__ == "__main__":
+    pdf_path = "C:\\Users\\Admin\\Downloads\\wordpress-pdf-invoice-plugin-sample.pdf"
+    output_path = "C:\\Users\\Admin\\Downloads\\file.json"  # Change to CSV or JSON output file
+    #page number here is based on index, so page 1 of file is denoted by 0 .
+    # similarly page 2 of file is denoted by 1 and so on.
+    fields_to_extract = {
+        'From:':[1,'Text'],
+        'To:':[1,'Text'],
+        #'Benefits to Issuers': [2,'Table'],  # Extract the next line for 'Hrs/Qty', but only the numeric part
+
+    }
+    for field,value in fields_to_extract.items():
+        process_pdf(pdf_path, output_path, field=field, value=value, output_format="JSON")
+
+
+--------------------------------------------------------------------------------------------------------------------------
+import csv
+import json
+import logging
+import fitz  # PyMuPDF for text extraction
+import pdfplumber  # Fallback for PDF text extraction
+
+logging.basicConfig(
+    filename="pdf_processing.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+def extract_with_fitz(doc, header):
+    """
+    Extract text from a PDF using PyMuPDF (fitz).
+    :param doc: The PDF document object.
+    :param header: The header text to look for.
+    :return: Extracted text or None if not found.
+    """
+    extracted_data = []
+    try:
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)  # Load page
+            text = page.get_text("text")  # Extract text
+            if header in text:
+                extracted_data.append(text)
+    except Exception as e:
+        logging.error(f"Error using PyMuPDF: {e}")
+    return extracted_data if extracted_data else None
+
+
+def extract_with_pdfplumber(pdf_path, header):
+    """
+    Extract text from a PDF using pdfplumber as a fallback.
+    :param pdf_path: The path to the PDF file.
+    :param header: The header text to look for.
+    :return: Extracted text or None if not found.
+    """
+    extracted_data = []
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if header in text:
+                    extracted_data.append(text)
+    except Exception as e:
+        logging.error(f"Error using pdfplumber: {e}")
+    return extracted_data if extracted_data else None
+
+
+def process_pdf(pdf_path, output_path, headers, output_format="CSV"):
+    """
+    Process a PDF file and extract text based on the provided headers.
+    :param pdf_path: Path to the PDF file.
+    :param output_path: Path to the output file (CSV or JSON).
+    :param headers: List of headers to search for in the PDF.
+    :param output_format: Output format for the extracted data (CSV/JSON).
+    """
+    extracted_data = {}
+    try:
+        # Step 1: Try extracting with fitz (PyMuPDF)
+        doc = fitz.open(pdf_path)
+        for header in headers:
+            data = extract_with_fitz(doc, header)
+            if data:
+                extracted_data[header] = data
+            else:
+                logging.info(f"'{header}' not found using PyMuPDF. Trying pdfplumber.")
+
+        # Step 2: If PyMuPDF fails, try pdfplumber
+        if not extracted_data:
+            for header in headers:
+                data = extract_with_pdfplumber(pdf_path, header)
+                if data:
+                    extracted_data[header] = data
+
+        # Step 3: Write to CSV or JSON
+        if output_format.upper() == "CSV":
+            with open(output_path, mode='w', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                for field, text in extracted_data.items():
+                    writer.writerow([field, ' '.join(text)])
+            logging.info(f"Data successfully written to CSV: {output_path}")
+
+        elif output_format.upper() == "JSON":
+            with open(output_path, mode='w', encoding='utf-8') as file:
+                json.dump(extracted_data, file, indent=4)
+            logging.info(f"Data successfully written to JSON: {output_path}")
+
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        print(f"Error: {e}")
+
+
+# Example usage:
+if __name__ == "__main__":
+    pdf_path = "/mnt/data/depositary-receipts-opportunity-product-paper.pdf"
+    output_path = "output.json"  # Can change to CSV if needed
+    headers = ["MANAGED ACCOUNT", "DEPOSITARY RECEIPTS"]  # List of headers to search for
+    process_pdf(pdf_path, output_path, headers, output_format="JSON")
+---------------------------------------------------------------------------------------------------------------------------------
+
+import pdfplumber
+from docx import Document
+import re
+
+# Function to convert PDF to Word
+def pdf_to_word(pdf_path, word_path):
+    with pdfplumber.open(pdf_path) as pdf:
+        doc = Document()
+        for page in pdf.pages:
+            text = page.extract_text()
+            doc.add_paragraph(text)
+        doc.save(word_path)
+    print(f"PDF converted to Word: {word_path}")
+
+# Function to extract text based on a header from Word document
+def extract_text_by_header(word_path, header):
+    doc = Document(word_path)
+    full_text = []
+    found_header = False
+    extracted_text = []
+
+    # Iterate through the paragraphs in the Word document
+    for para in doc.paragraphs:
+        para_text = para.text.strip()
+        
+        # Check if we found the header
+        if re.search(f'^{header}', para_text, re.IGNORECASE):
+            found_header = True
+            extracted_text.append(para_text)  # Include header
+        
+        # If header is found, keep adding paragraphs until next header or empty line
+        elif found_header:
+            if para_text == '' or re.search(r'^[A-Z\s]+$', para_text):  # Next header or empty line
+                break
+            extracted_text.append(para_text)
+    
+    if not extracted_text:
+        print(f"No content found for header: {header}")
+    else:
+        print(f"Extracted content for '{header}':\n")
+        print("\n".join(extracted_text))
+
+# Paths to the PDF and Word files
+pdf_path = "/mnt/data/depositary-receipts-opportunity-product-paper.pdf"
+word_path = "/mnt/data/output.docx"
+
+# Step 1: Convert PDF to Word
+pdf_to_word(pdf_path, word_path)
+
+# Step 2: Extract text by header (e.g., "MANAGED ACCOUNTS")
+extract_text_by_header(word_path, "MANAGED ACCOUNTS")
+
+--------------------------------------------------------------------------------------------------------------
+
+from pdfminer.high_level import extract_text
+
+def extract_paragraph_by_first_word(pdf_file_path, first_word):
+    # Extract all text from the PDF
+    text = extract_text(pdf_file_path)
+    
+    # Split text by line breaks (this assumes paragraphs are separated by new lines)
+    paragraphs = text.split('\n\n')  # Using double newlines to separate paragraphs
+    
+    # Clean up paragraphs and iterate over them
+    for paragraph in paragraphs:
+        # Strip leading/trailing spaces and check if the first word matches
+        paragraph = paragraph.strip()
+        
+        if paragraph.startswith(first_word):
+            return paragraph
+    
+    return f"No paragraph starts with the word '{first_word}'"
+
+# Example usage
+pdf_file_path = '/path/to/your/file.pdf'
+first_word = 'Managed'  # Replace with the first word you're looking for
+result = extract_paragraph_by_first_word(pdf_file_path, first_word)
+
+print(result)
+
+----------------------------------------------------------------------------------------------------------------------------
+
+import json
+import csv
+import fitz  # PyMuPDF
+from tabula import read_pdf  # For extracting tables
+
+
+def process_pdf(pdf_path, field=None, value=None):
+    extracted_data = []
+    try:
+        page_number = value[0] - 1  # Adjusting to 0-based index for PyMuPDF
+        data_type = value[1]
+
+        doc = fitz.open(pdf_path)  # Open the PDF
+        page = doc.load_page(page_number)  # Load the specified page
+
+        if data_type == 'Text':
+            text = page.get_text('json')  # Extract text as JSON
+            json_data = json.loads(text)
+            print(json_data)
+
+            found = False  # Track if we've found the desired field
+
+            # Iterate through blocks in the page
+            for block in json_data['blocks']:
+                for line in block['lines']:  # Iterate through lines within a block
+                    line_text = ""
+                    for span in line['spans']:  # Iterate through spans within a line
+                        span_text = span['text'].strip()
+
+                        # If the desired field is found, mark it as found
+                        if field in span_text:
+                            found = True
+                            continue  # Skip the span containing the field itself
+
+                        # Once the field is found, start collecting subsequent text
+                        if found:
+                            line_text += span_text
+
+                    if line_text:
+                        extracted_data.append(line_text)  # Append collected text after the field
+
+            # Combine all extracted text into a single string
+            combined_text = " ".join(extracted_data).strip()
+            return {field: combined_text} if combined_text else None
+
+        elif data_type == 'Table':
+            df = read_pdf(pdf_path, pages=value[0])  # Tabula to extract table
+            extracted_data = {}
+            for x in df:
+                if field in x.columns:
+                    extracted_data = x.to_dict()
+
+            return {field: extracted_data} if extracted_data else None
+
+        elif data_type == 'VTable':
+            df = read_pdf(pdf_path, pages=value[0])  # VTable (vertical table)
+            extracted_data = []
+            for x in df:
+                if field in x.columns:
+                    extracted_data = x[field].values.tolist()  # Convert to list
+                    break
+
+            return {field: extracted_data} if extracted_data else None
+
+    except Exception as e:
+        print(f"Error processing PDF: {e}")
+        return None
+
+
+def write_to_file(output_format, output_path, extracted_data):
+    try:
+        if output_format.upper() == "CSV":
+            with open(output_path, mode='w', newline='', encoding='utf-8') as file:
+                writer = csv.DictWriter(file, fieldnames=extracted_data[0].keys())
+                writer.writeheader()
+                writer.writerows(extracted_data)
+            print(f"Data successfully written to CSV: {output_path}")
+
+        elif output_format.upper() == "JSON":
+            with open(output_path, mode='w', encoding='utf-8') as file:
+                json.dump(extracted_data, file, indent=4)
+            print(f"Data successfully written to JSON: {output_path}")
+
+    except Exception as e:
+        print(f"Error writing file: {e}")
+
+
+def pdf_read_ops(pdf_path=None, output_path=None, output_format="JSON"):
+    pdf_path = "C:\\Users\\Admin\\Downloads\\depositary-receipts-opportunity-product-paper.pdf"
+    output_path = "C:\\Users\\Admin\\Downloads\\file.txt"  # Change to CSV or JSON output file
+
+    fields_to_extract = {
+        # 'From:': [1, 'Text'],
+        # 'To:': [1, 'Text'],
+        # 'Hrs/Qty': [1, 'Table'],
+        'SIZE OF THE DR MARKET': [4, 'Text'],
+        # 'Industry Leading Experience': [9, 'Text']
+    }
+
+    output_list = []
+    for field, value in fields_to_extract.items():
+        data = process_pdf(pdf_path, field=field, value=value)
+        if data:
+            output_list.append(data)
+
+    write_to_file(output_format, output_path, output_list)
+
+
+if __name__ == "__main__":
+    pdf_read_ops()

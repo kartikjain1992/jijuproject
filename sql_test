@@ -1,0 +1,10 @@
+SELECT
+  db1.table_name AS table1,
+  db1.column_name AS col1,
+  db2.table_name AS table2,
+  db2.column_name AS col2
+FROM 
+  db1.information_schema.columns db1
+  LEFT JOIN db2.information_schema.columns db2 ON
+    db1.table_name = db2.table_name AND db1.column_name = db2.column_name
+WHERE db2.column_name IS NULL;

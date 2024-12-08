@@ -1,0 +1,154 @@
+import pymysql
+from concurrent.futures import ThreadPoolExecutor
+
+class DatabaseComparator:
+    def __init__(self, host, user, password, db1, db2):
+        self.host = host
+        self.user = user
+        self.password = password
+        self.db1 = db1
+        self.db2 = db2
+
+    def connect_to_database(self, db_name):
+        return pymysql.connect(
+            host=self.host,
+            user=self.user,
+            password=self.password,
+            database=db_name
+        )
+
+    def fetch_data(self, conn, table_name, offset, limit):
+        with conn.cursor() as cursor:
+            cursor.execute(f"SELECT * FROM {table_name} LIMIT {limit} OFFSET {offset}")
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+        return rows, columns
+
+    def compare_data(self, rows1, rows2, columns):
+        mismatched_count = 0
+        blank_count = 0
+        mismatched_details = []
+        blank_details = []
+
+        for idx, (row1, row2) in enumerate(zip(rows1, rows2)):
+            for col_idx, (col1, col2) in enumerate(zip(row1, row2)):
+                column_name = columns[col_idx]
+                if col1 != col2:
+                    mismatched_count += 1
+                    mismatched_details.append((idx, column_name, col1, col2))
+                if col1 is None or col1 == '' or col2 is None or col2 == '':
+                    blank_count += 1
+                    blank_details.append((idx, column_name, col1, col2))
+
+        return mismatched_count, blank_count, mismatched_details, blank_details
+
+    def find_duplicates(self, rows, columns):
+        row_map = {}
+        duplicates = []
+
+        for idx, row in enumerate(rows):
+            row_tuple = tuple(row)
+            if row_tuple in row_map:
+                duplicates.append((row_map[row_tuple], idx, row))
+            else:
+                row_map[row_tuple] = idx
+
+        return duplicates
+
+    def process_chunk(self, start_index, chunk_size, table_name1, table_name2):
+        conn1 = self.connect_to_database(self.db1)
+        conn2 = self.connect_to_database(self.db2)
+
+        data1, columns1 = self.fetch_data(conn1, table_name1, start_index, chunk_size)
+        data2, columns2 = self.fetch_data(conn2, table_name2, start_index, chunk_size)
+
+        if columns1 != columns2:
+            raise ValueError("The columns in the two tables do not match.")
+
+        mismatched_count, blank_count, mismatched_details, blank_details = self.compare_data(data1, data2, columns1)
+        duplicates1 = self.find_duplicates(data1, columns1)
+        duplicates2 = self.find_duplicates(data2, columns2)
+
+        conn1.close()
+        conn2.close()
+
+        return mismatched_count, blank_count, mismatched_details, blank_details, duplicates1, duplicates2
+
+    def compare_databases(self, table_name1, table_name2, total_rows, chunk_size=100):
+        mismatched_total = 0
+        blank_total = 0
+        all_mismatched_details = []
+        all_blank_details = []
+        all_duplicates1 = []
+        all_duplicates2 = []
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [
+                executor.submit(self.process_chunk, i, chunk_size, table_name1, table_name2)
+                for i in range(0, total_rows, chunk_size)
+            ]
+
+            for future in futures:
+                mismatched_count, blank_count, mismatched_details, blank_details, duplicates1, duplicates2 = future.result()
+                mismatched_total += mismatched_count
+                blank_total += blank_count
+                all_mismatched_details.extend(mismatched_details)
+                all_blank_details.extend(blank_details)
+                all_duplicates1.extend(duplicates1)
+                all_duplicates2.extend(duplicates2)
+
+        print(f"Total mismatched data count: {mismatched_total}")
+        print(f"Total blank data count: {blank_total}")
+
+        if all_mismatched_details:
+            print("Mismatched Details:")
+            for detail in all_mismatched_details:
+                row_idx, column_name, col1, col2 = detail
+                print(f"Row: {row_idx}, Column: {column_name}, Database1: {col1}, Database2: {col2}")
+
+        if all_blank_details:
+            print("Blank Details:")
+            for detail in all_blank_details:
+                row_idx, column_name, col1, col2 = detail
+                print(f"Row: {row_idx}, Column: {column_name}, Database1: {col1}, Database2: {col2}")
+
+        if all_duplicates1:
+            print("Duplicates in Database1:")
+            for idx1, idx2, row in all_duplicates1:
+                print(f"Row {idx1} and Row {idx2} are duplicates: {row}")
+
+        if all_duplicates2:
+            print("Duplicates in Database2:")
+            for idx1, idx2, row in all_duplicates2:
+                print(f"Row {idx1} and Row {idx2} are duplicates: {row}")
+
+        return mismatched_total, blank_total, all_mismatched_details, all_blank_details, all_duplicates1, all_duplicates2
+
+
+
+
+*** Settings ***
+Library    DatabaseComparator.py    your_host    your_username    your_password    database1    database2
+
+*** Test Cases ***
+Compare Databases
+    [Documentation]    Compare two databases and print mismatches, blanks, and duplicates.
+    ${mismatched_total}    ${blank_total}    ${mismatched_details}    ${blank_details}    ${duplicates1}    ${duplicates2} =    Compare Databases    table1    table2    1000
+    Log    Total mismatched data count: ${mismatched_total}
+    Log    Total blank data count: ${blank_total}
+    
+    : FOR    ${detail}    IN    @{mismatched_details}
+    \    Log    Mismatched Detail: Row ${detail[0]}, Column ${detail[1]}, Database1: ${detail[2]}, Database2: ${detail[3]}
+    : END
+
+    : FOR    ${detail}    IN    @{blank_details}
+    \    Log    Blank Detail: Row ${detail[0]}, Column ${detail[1]}, Database1: ${detail[2]}, Database2: ${detail[3]}
+    : END
+
+    : FOR    ${duplicate}    IN    @{duplicates1}
+    \    Log    Duplicate in Database1: Row ${duplicate[0]} and Row ${duplicate[1]} are duplicates: ${duplicate[2]}
+    : END
+
+    : FOR    ${duplicate}    IN    @{duplicates2}
+    \    Log    Duplicate in Database2: Row ${duplicate[0]} and Row ${duplicate[1]} are duplicates: ${duplicate[2]}
+    : END

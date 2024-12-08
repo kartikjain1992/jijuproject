@@ -1,0 +1,433 @@
+#pip install pdfplumber
+#pip install pdfplumber openpyxl
+#pip install pdfplumber pandas openpyxl
+
+import pdfplumber
+import pandas as pd
+import re
+
+def clean_row(row):
+    """Clean and normalize the content of a row."""
+    cleaned_row = [cell.strip() if isinstance(cell, str) else cell for cell in row]
+    # Handle newline characters within cells
+    cleaned_row = [re.sub(r'\s+', ' ', cell) if isinstance(cell, str) else cell for cell in cleaned_row]
+    return cleaned_row
+
+def extract_tables_after_heading(pdf_path, heading_text):
+    """Extract tables from the PDF after a specified heading."""
+    with pdfplumber.open(pdf_path) as pdf:
+        tables = []
+        heading_found = False
+
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text is None:
+                continue
+
+            lines = text.split('\n')
+
+            # Look for the heading in the page
+            if not heading_found:
+                for line in lines:
+                    if heading_text.lower() in line.lower():
+                        heading_found = True
+                        break
+
+            # Once the heading is found, extract tables
+            if heading_found:
+                current_tables = page.extract_tables()
+                
+                if current_tables:
+                    for table in current_tables:
+                        combined_table = []
+                        current_header = None
+
+                        for row in table:
+                            cleaned_row = clean_row(row)
+                            
+                            # Ignore empty rows
+                            if all(cell is None or cell == '' for cell in cleaned_row):
+                                continue
+                            
+                            # Detecting the header
+                            if current_header is None:
+                                current_header = [cell for cell in cleaned_row if cell is not None and cell != '']
+                            else:
+                                # If the current row matches the header length, add it to the combined table
+                                if len(cleaned_row) == len(current_header):
+                                    combined_table.append(cleaned_row)
+                                else:
+                                    # If the row doesn't match the header length, treat it as a continuation or new data
+                                    combined_table.append(cleaned_row)
+
+                        # Filter out empty or malformed rows
+                        filtered_table = [row for row in combined_table if any(cell for cell in row)]
+                        if filtered_table:
+                            tables.append(filtered_table)
+
+                # Optionally stop searching after finding the first table
+                if tables:
+                    break  # Exit after finding the tables for the heading
+
+        return tables
+
+def extract_text_between_headings(pdf_path, start_heading):
+    """Extract text content between specified heading and the next heading."""
+    with pdfplumber.open(pdf_path) as pdf:
+        content = []
+        heading_found = False
+        found_start_heading = False
+
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text is None:
+                continue
+            
+            lines = text.split('\n')
+
+            for line in lines:
+                # Check if we found the start heading
+                if not found_start_heading:
+                    if start_heading.lower() in line.lower():
+                        found_start_heading = True
+                else:
+                    # Check if the line is another heading (here, we assume any uppercase line is a heading)
+                    if line.isupper() and line.strip() != start_heading.upper():
+                        break
+
+                    # Only add non-empty lines
+                    if line.strip():  
+                        content.append(line.strip())
+
+        return content
+
+def format_and_export_tables_to_excel(tables_data, heading):
+    """Format the extracted tables and export them to an Excel file."""
+    with pd.ExcelWriter(f"{heading}_extracted_tables.xlsx", engine='openpyxl') as writer:
+        for idx, table in enumerate(tables_data):
+            if len(table) > 1:  # At least one header and one row of data
+                header = table[0]
+                data_rows = table[1:]
+
+                # Normalize row lengths
+                formatted_rows = []
+                for row in data_rows:
+                    if len(row) < len(header):
+                        # Handle rows that are shorter than the header
+                        row.extend([''] * (len(header) - len(row)))  # Fill with empty strings
+                    formatted_rows.append(row)
+
+                # Check if all data rows match the header length
+                filtered_rows = [row for row in formatted_rows if len(row) == len(header)]
+
+                if filtered_rows:  # Only create DataFrame if there are valid rows
+                    df = pd.DataFrame(filtered_rows, columns=header)
+                    df.to_excel(writer, sheet_name=f'Table_{idx + 1}', index=False)
+
+# Main program execution
+pdf_path = '/content/wordpress-pdf-invoice-plugin-sample.pdf'
+
+# Ask user for search type
+search_choice = input("Choose search option - Type 'table' to search for tables or 'text' to search for text: ").strip().lower()
+
+if search_choice not in ['table', 'text']:
+    print("Invalid choice! Please enter 'table' or 'text'.")
+else:
+    heading = input("Enter the heading to search for: ").strip()
+
+    if search_choice == 'table':
+        tables_data = extract_tables_after_heading(pdf_path, heading)
+        if tables_data:
+            print(f"\nExtracted Tables for heading '{heading}':")
+            for idx, table in enumerate(tables_data):
+                print(f"\n--- Table {idx + 1} ---")
+                for row in table:
+                    filtered_row = [cell for cell in row if cell is not None and cell != '']
+                    if filtered_row:
+                        print(filtered_row)
+                print("\n--- End of Table ---")
+            
+            # Format and export to Excel
+            format_and_export_tables_to_excel(tables_data, heading)
+            print(f"\nTables exported to '{heading}_extracted_tables.xlsx'")
+        else:
+            print(f"\n{heading}: Table not found.")
+
+    elif search_choice == 'text':
+        text_content = extract_text_between_headings(pdf_path, heading)
+        if text_content:
+            print(f"\nExtracted Text for heading '{heading}':")
+            for line in text_content:
+                print(line)
+            # Optionally, save the text content to a file
+            with open(f"{heading}_extracted_text.txt", 'w') as text_file:
+                text_file.write("\n".join(text_content))
+            print(f"\nText content exported to '{heading}_extracted_text.txt'")
+        else:
+            print(f"\n{heading}: Text not found.")
+
+--------------------------------------------------------------------------------------------------------------------
+
+import json
+import fitz  # PyMuPDF
+
+
+def process_pdf_after_field(pdf_path, start_field=None):
+    try:
+        doc = fitz.open(pdf_path)  # Open the PDF
+        extracted_data = []
+        flag = False  # To track when the start field is found
+
+        # Iterate through all pages
+        for page_number in range(len(doc)):
+            page = doc[page_number]  # Get the current page
+            text_data = page.get_text("json")  # Extract text as JSON
+            json_data = json.loads(text_data)
+
+            # Check if 'blocks' exist in the JSON data
+            if 'blocks' in json_data:
+                # Iterate through text blocks
+                for b in json_data['blocks']:
+                    if 'lines' in b:
+                        for l in b['lines']:
+                            line_text = " ".join([s['text'].strip() for s in l['spans']])  # Combine spans into a line
+
+                            # If start field is found, begin collecting text
+                            if start_field.lower() in line_text.lower() and not flag:
+                                flag = True  # Start collecting text
+                                continue  # Skip the line containing the start field
+
+                            # Collect lines after the start field and stop when a logical break is found
+                            if flag:
+                                # Stop if an empty line or new section is encountered
+                                if line_text.strip() == "" or line_text[0].isdigit():
+                                    flag = False  # Stop collecting text
+                                    return extracted_data  # Return collected text
+
+                                # Collect valid lines between start and break
+                                extracted_data.append(line_text)
+
+        return extracted_data
+
+    except Exception as e:
+        print(f"Error processing PDF: {e}")
+        return None
+
+
+def write_to_json(output_path, extracted_data):
+    try:
+        with open(output_path, mode='w', encoding='utf-8') as file:
+            json.dump({"extracted_data": extracted_data}, file, indent=4)
+        print(f"Data successfully written to JSON: {output_path}")
+    except Exception as e:
+        print(f"Error writing to file: {e}")
+
+
+def pdf_read_ops(pdf_path=None, output_path=None, start_field="2.2 Style manuals"):
+    pdf_path = "C:\\Users\\Admin\\Downloads\\example.pdf"  # Replace with the path to your PDF
+    output_path = "C:\\Users\\Admin\\Downloads\\file.json"  # Replace with the desired output path
+
+    # Extract text after the start field until a logical break
+    extracted_data = process_pdf_after_field(pdf_path, start_field=start_field)
+
+    # Write the extracted data to JSON
+    if extracted_data:
+        write_to_json(output_path, extracted_data)
+---------------------------------------------------------------------------------------------------------------------------------
+
+import json
+import fitz  # PyMuPDF
+
+
+def process_pdf_after_fields(pdf_path, start_fields=None):
+    try:
+        doc = fitz.open(pdf_path)  # Open the PDF
+        extracted_data = {}
+        flag = False  # To track when any start field is found
+
+        # Ensure start_fields is a list
+        if not isinstance(start_fields, list):
+            start_fields = [start_fields]
+
+        # Iterate through all pages
+        for page_number in range(len(doc)):
+            page = doc[page_number]  # Get the current page
+            text_data = page.get_text("json")  # Extract text as JSON
+            json_data = json.loads(text_data)
+
+            # Check if 'blocks' exist in the JSON data
+            if 'blocks' in json_data:
+                # Iterate through text blocks
+                for b in json_data['blocks']:
+                    if 'lines' in b:
+                        for l in b['lines']:
+                            line_text = " ".join([s['text'].strip() for s in l['spans']])  # Combine spans into a line
+
+                            # If any start field is found, begin collecting text
+                            for field in start_fields:
+                                if field.lower() in line_text.lower() and not flag:
+                                    flag = True  # Start collecting text
+                                    extracted_data[field] = []  # Initialize for that start field
+                                    continue  # Skip the line containing the start field
+
+                            # Stop collecting text at an empty line or new section
+                            if flag:
+                                if line_text.strip() == "" or line_text[0].isdigit():  # Empty line or new section
+                                    flag = False  # Stop collecting text
+                                    break
+
+                                # Collect valid lines between start and break
+                                extracted_data[field].append(line_text)
+
+        # Join the text and return
+        return {field: " ".join(text) if text else None for field, text in extracted_data.items()}
+
+    except Exception as e:
+        print(f"Error processing PDF: {e}")
+        return None
+
+
+def write_to_json(output_path, extracted_data):
+    try:
+        with open(output_path, mode='w', encoding='utf-8') as file:
+            json.dump(extracted_data, file, indent=4)
+        print(f"Data successfully written to JSON: {output_path}")
+    except Exception as e:
+        print(f"Error writing to file: {e}")
+
+
+def pdf_read_ops(pdf_path=None, output_path=None, start_fields=None):
+    pdf_path = "/mnt/data/example.pdf"  # Replace with the path to your PDF
+    output_path = "/mnt/data/extracted_output.json"  # Replace with the desired output path
+
+    # Example of start fields (multiple values)
+    start_fields = start_fields or ["Introduction", "Abstract"]
+
+    # Extract text after the start fields until a logical break
+    extracted_data = process_pdf_after_fields(pdf_path, start_fields=start_fields)
+
+    # Write the extracted data to JSON
+    if extracted_data:
+        write_to_json(output_path, extracted_data)
+
+
+if __name__ == "__main__":
+    # Pass multiple start fields here
+    pdf_read_ops(start_fields=["Introduction", "Abstract", "Overview"])
+
+
+if __name__ == "__main__":
+    pdf_read_ops()
+--------------------------------------------------------------------------------------------------------------------------
+
+import json
+import csv
+import fitz  # PyMuPDF for handling PDF
+
+
+def extract_text_from_bbox(doc, page_number, bbox):
+    page = doc[page_number]
+    text = page.get_textbox(bbox)
+    print(f"Extracted text from bbox {bbox}: {text}")
+    return text
+
+
+def extract_field_text(json_data, field, doc, page_number):
+    extracted_data = set()
+    flag = False
+    bbox = None
+
+    for block in json_data['blocks']:
+        if 'lines' not in block:
+            print(f"Skipping block without 'lines': {block}")
+            continue
+
+        for line in block['lines']:
+            for span in line['spans']:
+                text = span['text'].strip()
+                print(f"Processing text: {text}")
+
+                if field in text and not flag:
+                    bbox = block['bbox']
+                    print(f"Field '{field}' found. BBox: {bbox}")
+                    flag = True
+
+                elif flag:
+                    extracted_text = extract_text_from_bbox(doc, page_number, bbox)
+                    extracted_text = extracted_text.replace('\n', ' ')
+                    extracted_data.add(extracted_text.strip())
+                    flag = False
+                    break
+
+    if not extracted_data:
+        print(f"No data extracted for field '{field}'")
+
+    return list(extracted_data)
+
+
+def process_pdf(pdf_path, field=None):
+    try:
+        doc = fitz.open(pdf_path)
+        extracted_data = {}
+
+        for page_number in range(len(doc)):
+            page = doc[page_number]
+            json_data = json.loads(page.get_text("json"))
+            print(f"Extracted JSON from page {page_number + 1}")
+
+            extracted_field_text = extract_field_text(json_data, field, doc, page_number)
+            if extracted_field_text:
+                extracted_data[f"Page {page_number + 1}"] = extracted_field_text
+
+        return {field: extracted_data} if extracted_data else None
+
+    except Exception as e:
+        print(f"Error processing PDF: {e}")
+        return None
+
+
+def write_to_file(output_format, output_path, extracted_data):
+    try:
+        if not extracted_data:
+            print("No data to write!")
+            return
+
+        if output_format.upper() == "CSV":
+            with open(output_path, mode='w', newline='', encoding='utf-8') as file:
+                writer = csv.DictWriter(file, fieldnames=extracted_data[0].keys())
+                writer.writeheader()
+                writer.writerows(extracted_data)
+            print(f"Data successfully written to CSV: {output_path}")
+
+        elif output_format.upper() == "JSON":
+            with open(output_path, mode='w', encoding='utf-8') as file:
+                json.dump(extracted_data, file, indent=4, ensure_ascii=False)
+            print(f"Data successfully written to JSON: {output_path}")
+
+    except Exception as e:
+        print(f"Error writing file: {e}")
+
+
+def pdf_read_ops(pdf_path, output_path, output_format="JSON"):
+    fields_to_extract = {
+        'Sales': [1, 'Text'],
+        'Los Angeles:': [2, 'Text']
+    }
+
+    output_list = []
+    for field in fields_to_extract.keys():
+        print(f"Processing field: {field}")
+        data = process_pdf(pdf_path, field=field)
+        if data:
+            output_list.append(data)
+        print(f"Extracted data: {data}")
+
+    write_to_file(output_format, output_path, output_list)
+
+
+if __name__ == "__main__":
+    pdf_path = "C:/Users/Admin/Downloads/drylab.pdf"
+    output_path = "C:/Users/Admin/Downloads/file.json"
+    pdf_read_ops(pdf_path, output_path, output_format="JSON")
+
+

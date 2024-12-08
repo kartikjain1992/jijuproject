@@ -1,0 +1,683 @@
+import PyPDF4
+import logging
+
+# Configure logging
+logging.basicConfig(filename='pdf_reader.log', level=logging.ERROR,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
+def read_pdf(file_path):
+    try:
+        # Open the PDF file
+        with open(file_path, 'rb') as file:
+            # Create a PDF reader object
+            pdf_reader = PyPDF4.PdfFileReader(file)
+            
+            # Check if the PDF is encrypted
+            if pdf_reader.isEncrypted:
+                try:
+                    pdf_reader.decrypt('')
+                except Exception as e:
+                    logging.error(f"Failed to decrypt PDF: {e}")
+                    return None
+            
+            # Get the number of pages
+            num_pages = pdf_reader.getNumPages()
+            
+            # Extract text from each page
+            text = ""
+            for page_num in range(num_pages):
+                try:
+                    page = pdf_reader.getPage(page_num)
+                    text += page.extractText()
+                except Exception as e:
+                    logging.error(f"Failed to extract text from page {page_num}: {e}")
+                    continue
+            
+            return text
+
+    except FileNotFoundError:
+        logging.error(f"File not found: {file_path}")
+    except PyPDF4.utils.PdfReadError as e:
+        logging.error(f"Error reading PDF: {e}")
+    except Exception as e:
+        logging.error(f"An unexpected error occurred: {e}")
+
+    return None
+
+# Example usage
+file_path = 'example.pdf'  # Replace with your PDF file path
+pdf_text = read_pdf(file_path)
+if pdf_text:
+    print(pdf_text)
+else:
+    print("Failed to read PDF.")
+
+-------------------------------------------------------------------------------------------------------------------------
+
+import pdfplumber
+
+def extract_continuing_table_after_heading(pdf_path, heading_text):
+    with pdfplumber.open(pdf_path) as pdf:
+        tables = []
+        heading_found = False
+
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text is None:
+                continue
+
+            lines = text.split('\n')
+
+            if not heading_found:
+                for line in lines:
+                    if heading_text.lower() in line.lower():
+                        heading_found = True
+                        break
+
+            if heading_found:
+                current_tables = page.extract_tables()
+
+                if current_tables:
+                    for table in current_tables:
+                        combined_table = []
+                        current_header = None
+                        for row in table:
+                            if any(cell is not None and cell != '' for cell in row):
+                                if current_header is None:
+                                    current_header = [cell for cell in row if cell is not None and cell != '']
+                                else:
+                                    if len(row) > 1 and all(cell is None or cell == '' for cell in current_header[1:]):
+                                        current_header.append(row[0])
+                                    else:
+                                        combined_table.append(current_header)
+                                        current_header = [cell for cell in row if cell is not None and cell != '']
+                            else:
+                                if current_header is not None:
+                                    combined_table.append(current_header)
+                                    current_header = None
+
+                        if current_header:
+                            combined_table.append(current_header)
+
+                        filtered_table = [row for row in combined_table if any(cell for cell in row)]
+
+                        if filtered_table:
+                            tables.append(filtered_table)
+
+                if tables and current_tables:
+                    last_row = tables[-1][-1]
+                    first_row_of_next_table = current_tables[0][0] if current_tables else None
+
+                    if first_row_of_next_table and last_row and first_row_of_next_table[0] == last_row[0]:
+                        tables[-1].extend(current_tables[0])
+
+        return tables
+
+pdf_path = '/content/depositary-receipts-opportunity-product-paper.pdf'
+
+example_headings = [
+    "User Interface",
+    "API"
+]
+
+for heading in example_headings:
+    tables_data = extract_continuing_table_after_heading(pdf_path, heading)
+    if tables_data:
+        print(f"\nExtracted Tables for heading '{heading}':")
+        for idx, table in enumerate(tables_data):
+            print(f"\n--- Table {idx + 1} ---")
+            for row in table:
+                filtered_row = [cell for cell in row if cell is not None and cell != '']
+                if filtered_row:
+                    print(filtered_row)
+            print("\n--- End of Table ---")
+    else:
+        print(f"\n{heading}: Table not found.")
+
+------------------------------------------------------------------------------------------------------------------------
+
+import random
+import string
+
+def generate_random_string(length):
+    letters = string.ascii_letters  # Contains both lowercase and uppercase letters
+    return ''.join(random.choice(letters) for _ in range(length))
+
+# Example usage:
+random_string = generate_random_string(50)
+print(random_string)
+
+
+
+
+def generate_random_number(digits):
+    try:
+        if digits < 1:
+            raise ValueError("Number of digits should be at least 1")
+        start = 10 ** (digits - 1)
+        end = (10 ** digits) - 1
+        return random.randint(start, end)
+
+    except ValueError as e:
+        return str(e)
+    except Exception as e:
+        return f"An error occurred: {str(e)}"
+
+
+# Example usage:
+random_number = generate_random_number(3.0)
+print(random_number)
+
+
+def generate_alphanumeric_string(length):
+    try:
+        if length < 1:
+            raise ValueError("Length should be at least 1")
+        characters = string.ascii_letters + string.digits  # Letters (both cases) and digits
+        return ''.join(random.choice(characters) for _ in range(length))
+
+    except ValueError as e:
+        return str(e)
+    except Exception as e:
+        return f"An error occurred: {str(e)}"
+
+
+# Example usage:
+alphanumeric_string = generate_alphanumeric_string(10)
+print(alphanumeric_string)
+--------------------------------------------------------------------------------------------------------------------
+import os
+import shutil
+import zipfile
+from datetime import datetime
+
+# Get the current time (hour and minute)
+now = datetime.now()
+timestamp = now.strftime("%Y-%m-%d_%H-%M")
+report_folder = f"../nextgen-python/Archive_Reports/AutomationReport_{timestamp}"
+
+# Create the folder with today's date and time
+os.makedirs(report_folder, exist_ok=True)
+
+# Move files from the Results folder to the newly created folder
+results_folder = "../nextgen-python/Results"
+for item in os.listdir(results_folder):
+    item_path = os.path.join(results_folder, item)
+    destination = os.path.join(report_folder, item)
+    if os.path.isfile(item_path):
+        shutil.move(item_path, destination)
+    elif os.path.isdir(item_path):
+        shutil.move(item_path, destination)
+
+# Append the new folder to Archive_Reports.zip
+zip_path = "../nextgen-python/Archive_Reports.zip"
+with zipfile.ZipFile(zip_path, 'a', zipfile.ZIP_DEFLATED) as archive:
+    for root, _, files in os.walk(report_folder):
+        for file in files:
+            file_path = os.path.join(root, file)
+            archive.write(file_path, os.path.relpath(file_path, os.path.dirname(report_folder)))
+
+print(f"Files moved and added to {zip_path} successfully.")
+
+----------------------------------------------------------------------------------------------------
+
+REM Zip the Archive_Reports directory using PowerShell
+set "zip_path=..\nextgen-python\Archive_Reports.zip"
+powershell -command "if (Test-Path '%zip_path%') { Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::Open('%zip_path%', 'Update').CreateEntryFromFile('%report_folder%', 'AutomationReport_%timestamp%'); } else { Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::CreateFromDirectory('%report_folder%', '%zip_path%'); }"
+
+------------------------------------------------------------------------------------------
+
+REM Zip the Archive_Reports directory using tar
+set "zip_path=..\nextgen-python\Archive_Reports.zip"
+
+REM Check if the zip file already exists
+if exist "%zip_path%" (
+    REM If the zip file exists, append the new folder to the existing zip
+    tar -uf "%zip_path%" -C "..\nextgen-python\Archive_Reports" "AutomationReport_%timestamp%"
+) else (
+    REM If the zip file does not exist, create a new zip file
+    tar -cf "%zip_path%" -C "..\nextgen-python\Archive_Reports" "AutomationReport_%timestamp%"
+)
+
+REM Append the new folder to Archive_Reports.zip using 7z
+REM Ensure 7z is installed and the path is added to the system PATH environment variable
+set "zip_path=..\nextgen-python\Archive_Reports.zip"
+7z a -tzip "%zip_path%" "%report_folder%\*" -r
+
+echo Files moved and added to %zip_path% successfully.
+
+---------------------------------------
+
+"C:\Program Files\7-Zip\7z.exe" u "..\nextgen-python\Archive_Reports.zip" "..\nextgen-python\Archive_Reports\*"
+
+
+-----------------------------------------
+
+for /f "tokens=2 delims==" %%a in ('wmic os get localdatetime ^| find "."') do (
+    set "datetime=%%a"
+    set "year=!datetime:~0,4!"
+    set "month=!datetime:~4,2!"
+    set "day=!datetime:~6,2!"
+)
+
+REM Get the current time (hour, minute) using wmic
+set "hour=!datetime:~8,2!"
+set "minute=!datetime:~10,2!"
+
+REM Create a timestamp and the report folder
+set "timestamp=!year!-!month!-!day!_!hour!-!minute!"
+
+---------------------------------------------------------------------------------------
+
+rowindex = int(rowindex)
+
+    # Load the workbook and access the specified sheet
+    wb = openpyxl.load_workbook(path)
+    ws = wb[sheetname]  # Access the sheet by name
+    
+    # Get the headers from the first row
+    headers = [cell.value for cell in ws[1]]  # Read the first row
+
+    # Check if the columnName exists in the headers
+    if columnName not in headers:
+        raise ValueError(f"Column header '{columnName}' not found in the headers.")
+
+    # Find the index of the specified column header and adjust to 1-indexed
+    columnindex = headers.index(columnName) + 1
+
+    # Access the cell using the specified row index and the found column index
+    cell_obj = ws.cell(row=rowindex + 1, column=columnindex)
+    
+    return cell_obj.value
+---------------------------------------------------------
+if __name__ == "__main__":
+    # Define the path to the Excel file and the sheet name
+    path = "test_data.xlsx"  # Replace with the actual path to your Excel file
+    sheetname = "Sheet1"  # Replace with the actual sheet name in your Excel file
+    rowindex = 2  # Specify the row number (1-indexed)
+    columnName = "Name"  # Replace with the column header name
+
+    # Call the function and print the value
+    try:
+        value = read_cell_value_by_header(path, sheetname, rowindex, columnName)
+        print(f"The value in row {rowindex} under the '{columnName}' column is: {value}")
+    except ValueError as e:
+        print(f"Error: {e}")
+
+---------------------------------------------------------------------------------------------------------------
+
+import os
+import subprocess
+from datetime import datetime
+import shutil
+import time
+
+# Set the paths
+result_path = r"..\RobotPython\Result"
+zip_path = r"..\RobotPython\Archive_Reports.zip"
+archive_reports_path = r"..\RobotPython\Archive_Reports"
+
+# Get the current date and time
+now = datetime.now()
+timestamp = now.strftime("%Y_%m_%d_%H_%M")
+
+# Create a folder with today's date and time
+report_folder = os.path.join(archive_reports_path, f"AutomationReport_{timestamp}")
+os.makedirs(report_folder, exist_ok=True)
+
+# Move files from the Results folder to the newly created folder
+if os.path.exists(result_path):
+    for item in os.listdir(result_path):
+        source = os.path.join(result_path, item)
+        destination = os.path.join(report_folder, item)
+        try:
+            if os.path.isfile(source):
+                shutil.move(source, destination)
+                print(f"Moved file: {source} to {destination}")
+            elif os.path.isdir(source):
+                shutil.move(source, destination)
+                print(f"Moved directory: {source} to {destination}")
+        except Exception as e:
+            print(f"Failed to move {source}. Error: {e}")
+
+# Wait for 2 seconds
+time.sleep(2)
+
+# Check if the zip file already exists and create or update the zip file
+try:
+    if os.path.exists(zip_path):
+        # If the zip file exists, append the new folder to the existing zip
+        print("Appending to existing zip...")
+        subprocess.run(["7z", "a", zip_path, report_folder], check=True)
+    else:
+        # If the zip file does not exist, create a new zip file
+        print("Creating new zip...")
+        subprocess.run(["7z", "a", zip_path, report_folder], check=True)
+
+    print(f"Files moved successfully to Archive Result folder!")
+    print(f"Archive created at {zip_path}")
+
+except subprocess.CalledProcessError as e:
+    print(f"Failed to create or update the zip. Error: {e}")
+--------------------------------------------------------------------------------------------------------------------
+
+from robot.api import ExecutionResult, ResultVisitor
+import subprocess
+
+class RunBatchAfterSuite(ResultVisitor):
+    def __init__(self, batch_file_path):
+        self.batch_file_path = batch_file_path
+
+    def visit_suite(self, suite):
+        if suite.status == 'PASS' or suite.status == 'FAIL':
+            # Run the batch file after suite execution is complete
+            subprocess.call([self.batch_file_path])
+
+def end_execution(data, result: ExecutionResult):
+    # Replace with the path to your batch file
+    batch_file_path = "path_to_your_batch_file.bat"
+    result.visit(RunBatchAfterSuite(batch_file_path))
+
+----------------------------------------------------------------------------------------------------
+from robot.api.deco import keyword
+import os
+import subprocess
+
+class FileMover:
+    
+    @keyword('runMovetoBatFile')
+    def runFile(self, filepath):
+        os.system(filepath)
+        return "move files"
+
+class CustomListener:
+    ROBOT_LISTENER_API_VERSION = 2
+
+    def __init__(self):
+        self.file_mover = FileMover()
+
+    def close(self):
+        # Specify the path to your batch file
+        batch_file_path = r"path_to_your_batch_file.bat"
+        self.file_mover.runFile(batch_file_path)
+------------------------------------------------------------------------------
+from robot.api.deco import keyword
+import os
+
+class FileMoverWithListener:
+    ROBOT_LISTENER_API_VERSION = 2
+
+    def __init__(self):
+        pass
+
+    @keyword('runMovetoBatFile')
+    def runFile(self, filepath):
+        os.system(filepath)
+        return "move files"
+
+    def close(self):
+        # Specify the path to your batch file
+        batch_file_path = r"path_to_your_batch_file.bat"
+        self.runFile(batch_file_path)
+
+# Example of calling the method directly in Python
+if __name__ == "__main__":
+    # Create an instance of the FileMoverWithListener class
+    mover = FileMoverWithListener()
+
+    # Call the runMovetoBatFile method directly
+    batch_file_path = r"path_to_your_batch_file.bat"  # Update with your actual batch file path
+    result = mover.runFile(batch_file_path)
+    print(result)  # This will print "move files"
+
+-----------------------------------------------
+import subprocess
+
+def run_batch_file(batch_file_path):
+    """
+    Run a batch file using subprocess.
+
+    :param batch_file_path: The path to the batch file to execute.
+    :return: None
+    """
+    try:
+        # Run the batch file
+        result = subprocess.run(batch_file_path, check=True, shell=True)
+        print("Batch file executed successfully!")
+    except subprocess.CalledProcessError as e:
+        print(f"Error executing batch file: {e}")
+
+if __name__ == "__main__":
+    # Specify the path to your batch file
+    batch_file_path = r"path_to_your_batch_file.bat"  # Update with your actual batch file path
+    
+    # Call the function to execute the batch file
+    run_batch_file(batch_file_path)
+
+---------------------------------------------------------------------------------------
+
+import subprocess
+from robot.api import logger
+
+class RunBatFileListener:
+    ROBOT_LISTENER_API_VERSION = 2
+
+    def __init__(self):
+        self.bat_file_path = 'path_to_your_bat_file.bat'  # Update this with the actual path to your batch file
+
+    def close(self):
+        """This method is called after all tests are executed."""
+        logger.info("Running batch file after test execution.")
+        try:
+            subprocess.run([self.bat_file_path], check=True)
+            logger.info("Batch file executed successfully.")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to execute batch file. Error: {e}")
+-----------------------------------------------------------------------------------
+import os
+import subprocess
+from datetime import datetime
+import shutil
+import time
+from robot.api import logger
+
+class RunArchiveListener:
+    ROBOT_LISTENER_API_VERSION = 2
+
+    def __init__(self):
+        # Set the paths
+        self.result_path = r"..\RobotPython\Result"
+        self.zip_path = r"..\RobotPython\Archive_Reports.zip"
+        self.archive_reports_path = r"..\RobotPython\Archive_Reports"
+
+    def close(self):
+        """This method is called after all tests are executed."""
+        logger.info("Starting the process to archive test results.")
+        
+        # Get the current date and time
+        now = datetime.now()
+        timestamp = now.strftime("%Y_%m_%d_%H_%M")
+
+        # Create a folder with today's date and time
+        report_folder = os.path.join(self.archive_reports_path, f"AutomationReport_{timestamp}")
+        os.makedirs(report_folder, exist_ok=True)
+
+        # Move files from the Results folder to the newly created folder
+        if os.path.exists(self.result_path):
+            for item in os.listdir(self.result_path):
+                source = os.path.join(self.result_path, item)
+                destination = os.path.join(report_folder, item)
+                try:
+                    if os.path.isfile(source):
+                        shutil.move(source, destination)
+                        logger.info(f"Moved file: {source} to {destination}")
+                    elif os.path.isdir(source):
+                        shutil.move(source, destination)
+                        logger.info(f"Moved directory: {source} to {destination}")
+                except Exception as e:
+                    logger.error(f"Failed to move {source}. Error: {e}")
+
+        # Wait for 2 seconds
+        time.sleep(2)
+
+        # Check if the zip file already exists and create or update the zip file
+        try:
+            if os.path.exists(self.zip_path):
+                # If the zip file exists, append the new folder to the existing zip
+                logger.info("Appending to existing zip...")
+                subprocess.run(["7z", "a", self.zip_path, report_folder], check=True)
+            else:
+                # If the zip file does not exist, create a new zip file
+                logger.info("Creating new zip...")
+                subprocess.run(["7z", "a", self.zip_path, report_folder], check=True)
+
+            logger.info(f"Files moved successfully to Archive Result folder!")
+            logger.info(f"Archive created at {self.zip_path}")
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to create or update the zip. Error: {e}")
+--------------------------------------------------------------------------------
+
+@echo off
+REM Get the current script's directory
+set script_dir=%~dp0
+
+REM Remove the trailing backslash (if any)
+set script_dir=%script_dir:~0,-1%
+
+REM Go up one level from the current script directory
+for %%a in ("%script_dir%") do set project_root=%%~dpa..
+
+REM Construct the result path using the project root with "Results"
+set result_path=%project_root%\Results
+
+REM Print the paths
+echo Project root: %project_root%
+echo Result path: %result_path%
+
+pause
+------------------------------------------------
+
+import os
+import shutil
+
+result_path = r"..\RobotPython\Result"
+
+def start_suite():
+    # Check if the Results folder exists
+    if os.path.exists(result_path):
+        # Loop through all files and directories in the Results folder
+        for item in os.listdir(result_path):
+            item_path = os.path.join(result_path, item)
+            try:
+                if os.path.isfile(item_path):
+                    os.remove(item_path)  # Remove the file
+                    print(f"Removed file: {item_path}")
+                elif os.path.isdir(item_path):
+                    shutil.rmtree(item_path)  # Remove the directory and its contents
+                    print(f"Removed directory: {item_path}")
+            except Exception as e:
+                print(f"Failed to delete {item_path}. Error: {e}")
+
+------------------------------------------------------------------------------------------------------------------------
+import pandas as pd
+
+class DataReader:
+    def __init__(self):
+        self.datamap = {}
+        self.index = None
+
+    def get_data(self, scenario_name, path, sheetname, target_column):
+        # Read Excel sheet into a dictionary
+        reader = pd.read_excel(path, sheet_name=sheetname).to_dict()
+        
+        # Get the number of scenarios in the datasheet
+        scenarios_in_datasheet = len(reader['TestDataID'].keys())
+        
+        for i in range(scenarios_in_datasheet):
+            # Check if the scenario matches the entry in the Excel sheet
+            if str(reader['TestDataID'].get(i)).strip() in scenario_name.split('*-*')[0].strip():
+                # Store data globally for access
+                self.datamap = reader
+                self.index = i
+                break
+
+        # If index is set, return the requested column value; otherwise, return None
+        return self.datamap.get(target_column, {}).get(self.index)
+
+    def get_data_map(self):
+        return self.datamap
+
+----------------------------------------------------------------------------------------------------------------------
+
+import pandas as pd
+
+class DataReader:
+    def __init__(self):
+        self.data_list = []
+
+    def get_excel_data(self, scenario_name, path, sheetname, target_columns):
+        # Load the sheet into a DataFrame
+        df = pd.read_excel(path, sheet_name=sheetname)
+        
+        # Filter rows where 'TestDataID' matches the scenario_name
+        matched_rows = df[df['TestDataID'].str.strip() == scenario_name.strip()]
+        
+        # Extract values for each occurrence of TestDataID
+        for _, row in matched_rows.iterrows():
+            data = {col: row[col] for col in target_columns if col in row}
+            self.data_list.append(data)
+        
+        return self.data_list
+
+    def get_data_list(self):
+        return self.data_list
+---------------------------------------------------------------------------------------------------------------------------
+
+from Crypto.Cipher import DES3
+from Crypto.Util.Padding import unpad
+import base64
+
+# Constants
+ENCRYPTION_KEY = "WelcomeToBYNMNextGenFramework"  # Must be 24 bytes for DES3
+
+
+def decrypt_password(encrypted_string):
+    """
+    Decrypts an encrypted password using the DES3 algorithm.
+    
+    :param encrypted_string: The base64 encoded encrypted password.
+    :return: The decrypted password as a string.
+    """
+    try:
+        # Ensure the encryption key is exactly 24 bytes (padding or truncating if needed)
+        encryption_key = ENCRYPTION_KEY.encode('utf-8')[:24]
+        cipher = DES3.new(encryption_key, DES3.MODE_ECB)
+        
+        # Decode the encrypted string and decrypt it
+        encrypted_bytes = base64.b64decode(encrypted_string)
+        plain_text = unpad(cipher.decrypt(encrypted_bytes), DES3.block_size)
+        return plain_text.decode('utf-8')
+    except Exception as e:
+        print(f"Error during decryption: {e}")
+        return None
+
+
+# Example Usage
+if __name__ == "__main__":
+    encrypted_password = "ENCRYPTED_STRING_HERE"  # Replace with your encrypted password
+    decrypted_password = decrypt_password(encrypted_password)
+    
+    if decrypted_password:
+        print(f"Decrypted Password: {decrypted_password}")
+    else:
+        print("Failed to decrypt the password.")
+
+
+
+
+
+
+
+
+
